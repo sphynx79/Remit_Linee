@@ -1,0 +1,15 @@
+mongo:
+  db: 'remit'
+  # @todo: mettere l'host pc olanda
+  #  adress: 'WPWS07133656'
+  adress: '127.0.0.1'
+  ip: '27017'
+path:
+  download: './excel_file/download/' 
+  conversione: './excel_file/conversione/' 
+  anagrafica: './config/Anagrafica Unità4.0.xlsx'
+  anagrafica_csv: './config/Anagrafica.csv'
+  csv_export: '//ensv1a04.eni.pri/Dme-share-afs-pr/Report_20/export.csv'
+  csv_report: '//ennf1002/unitagp/MEOR/simulazione MODUS/03 Report REMIT/export.csv'
+
+

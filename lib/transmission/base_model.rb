@@ -2,20 +2,12 @@
 
 module Transmission
   class BaseModel
-    @@config = Transmission::Configuration.config.mongo
+
     attr_reader :client
 
     def initialize()
-      Mongo::Logger.level = eval(@@config["log_level"])
+      Mongo::Logger.level = eval(Transmission::Config.database.log_level)
       @client ||= connect_db
-    end
-
-    def self.config
-      @@config
-    end
-
-    def config
-      @@config
     end
 
     #
@@ -30,9 +22,9 @@ module Transmission
     #
     def connect_db
       begin
-        adress   =  @@config['adress']
-        port     =  @@config['port']
-        database =  'transmission'
+        adress   = Transmission::Config.database.adress
+        port     = Transmission::Config.database.port
+        database = Transmission::Config.database.name
         client   = Mongo::Client.new(["#{adress}:#{port}"],
                                    database: database,
                                    server_selection_timeout: 5,
@@ -41,6 +33,7 @@ module Transmission
         client
       rescue Mongo::Error::NoServerAvailable => e
         puts 'Cannot connect to the server'
+        puts 'Controllare in config che IP, PORTA, NOME database siano corretti'
         # Error.report_error('Cannot connect to the server')
       end
     end

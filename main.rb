@@ -17,6 +17,7 @@ require 'pry'
 require 'fuzzy_match'
 require 'amatch'
 require 'settingslogic'
+require 'yell'
 require 'lib/transmission'
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))
@@ -36,10 +37,6 @@ module Transmission
 
   desc 'Setto se lanciarlo in verbose mode'
   switch %i[v verbose]
-
-  desc 'Log level [debug, info, warn, error, fatal]'
-  default_value 'info'
-  flag %i[l log], required: false
 
   desc 'Interfaccia da usare [gui, cli, scheluder]'
   default_value 'cli'
@@ -68,6 +65,7 @@ module Transmission
     if global[:enviroment] == "development"
       set_development
     end
+    init_log(global[:verbose])
     set_env(command, global, options)
     Transmission::Initialization.call()
     true
@@ -89,10 +87,11 @@ module Transmission
   end
 
   def init_log(level)
-    # Yell.new(name: Object, format: false) do |l|
-    #   l.adapter STDOUT, colors: true, level: "gte.#{level} lt.warn"
-    #   l.adapter STDERR, colors: true, level: 'error', format: false
-    # end
+    level = level ? "debug" : "info"
+    Yell.new(name: Object, format: false) do |l|
+      l.adapter STDOUT, colors: true, level: "gte.#{level} lte.warn"
+      l.adapter STDERR, colors: true, level: 'gte.error', format: false
+    end
     # Yell.new(name: 'scheduler', format: Yell.format('%d: %m', '%d-%m-%Y %H:%M')) do |l|
     #   l.adapter STDOUT, colors: false, level: 'at.warn'
     #   l.adapter STDERR, colors: false, level: 'at.error'
@@ -102,7 +101,7 @@ module Transmission
     #   l.adapter STDOUT, colors: false, level: 'at.info'
     # end
     #
-    # Object.send :include, Yell::Loggable
+    Object.send :include, Yell::Loggable
   end
 
   def set_trace_point
@@ -127,10 +126,6 @@ module Transmission
     # trace.enable
   end
 
-  def init_verbose(verbose)
-    # $VERBOSE_MODE = verbose
-  end
-
   def set_development
     ENV['GLI_DEBUG'] = 'true'
     require 'ap'
@@ -143,7 +138,6 @@ module Transmission
     controller = command.name.to_s
     @env = {controller:       controller,
             action:           action,
-            global_options:   global,
             command_options:  options,
             }
   end

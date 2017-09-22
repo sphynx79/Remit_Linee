@@ -1,10 +1,8 @@
 module Transmission
-  class Configuration
+  class Initialization
     class << self
-      attr_accessor :env
 
-      def call(env)
-        self.env = env
+      def call()
         load_file
       end
 
@@ -42,26 +40,6 @@ module Transmission
         #   autoload ActiveSupport::Inflector.camelize(filename), layout_file
         # end
       end
-
-      def config
-        read_config
-        # SITE          = config_url.site
-      end
-
-      def read_config
-        y = YAML.load_file config_path
-        s = OpenStruct.new
-        y.each do |k, v|
-          k = k.to_s if !k.respond_to?(:to_sym) && k.respond_to?(:to_s)
-          s.send("#{k}=".to_sym, v)
-        end
-        return s
-      end
-
-      def config_path
-        File.join(__dir__,"../../config/config.yml")
-      end
-
 
     end
   end

@@ -8,7 +8,6 @@ HOUR_STEP   = (1.to_f/24)
 
 class TransmissionModel < Transmission::BaseModel
 
-
   def collection(collection: "transmission")
     client[collection]
   end

@@ -16,9 +16,8 @@ require 'simple_xlsx_reader'
 require 'pry'
 require 'fuzzy_match'
 require 'amatch'
+require 'settingslogic'
 require 'lib/transmission'
-# require 'config/application'
-
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))
 APP_NAME    = APP_ROOT.basename.to_s
@@ -70,7 +69,7 @@ module Transmission
       set_development
     end
     set_env(command, global, options)
-    Transmission::Configuration.call(@env)
+    Transmission::Initialization.call()
     true
   end
 
@@ -139,14 +138,13 @@ module Transmission
   end
 
   def set_env(command, global, options)
+    ENV['APP_ENV'] ||= global[:enviroment]
     action     = "start"
     controller = command.name.to_s
-    config     = Transmission::Configuration.config
     @env = {controller:       controller,
             action:           action,
             global_options:   global,
             command_options:  options,
-            config:           config
             }
   end
 

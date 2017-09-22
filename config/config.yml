@@ -1,14 +1,23 @@
-mongo:
-  db: 'remit'
-  # @todo: mettere l'host pc olanda
-  #  adress: 'WPWS07133656'
-  adress: '127.0.0.1'
-  ip: '27017'
-  # log_level: ::Logger::FATAL
-  log_level: "::Logger::INFO"
-path:
-  download: './excel_file/download/' 
-url:
-  site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx'
+defaults: &defaults
+  database:
+    name: 'transmission'
+    adress: '127.0.0.1'
+    port: '27018'
+    log_level: "::Logger::INFO"
+  path:
+    download: './excel_file/download/'
+  url:
+    site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
+
+development:
+  <<: *defaults
+  altro: 800
+
+test:
+  <<: *defaults
+
+production:
+  <<: *defaults
+
 
  

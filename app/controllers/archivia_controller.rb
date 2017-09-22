@@ -31,7 +31,7 @@ class ArchiviaController < Transmission::BaseController
   # Lista dei file presenti nella cartella download
   #
   def lista_file
-    Dir.glob(env[:config].path["download"]+"/*.xlsx")
+    Dir.glob(Transmission::Config.path.download + "/*.xlsx")
   end
 
   #
@@ -111,7 +111,7 @@ class ArchiviaController < Transmission::BaseController
 
   def controlla_nome_terna
     # ap db.all_document_from(collection: "transmission")
-    db.ᐅ(~:all_document_from, collection: "transmission")
+    ap db.ᐅ(~:all_document_from, collection: "transmission")
 
     remit_terna.each do |row|
       nome = row[:nome]

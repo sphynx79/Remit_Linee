@@ -48,7 +48,7 @@ class DownloadController < Transmission::BaseController
     end
 
     def download_path
-      File.expand_path(env[:config].path["download"], APP_ROOT)
+      File.expand_path(Transmission::Config.path.download, APP_ROOT)
     end
 
     def url_file
@@ -59,7 +59,7 @@ class DownloadController < Transmission::BaseController
     end
 
     def site
-      env[:config].url["site"]
+      Transmission::Config.url.site
     end
 
     memoize :page

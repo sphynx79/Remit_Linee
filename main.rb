@@ -2,6 +2,8 @@
 
 $LOAD_PATH.unshift '.'
 
+RubyVM::InstructionSequence.compile_option = { tailcall_optimization: true, trace_instruction: false }
+
 require 'active_support/core_ext/string/inflections'
 require 'pathname'
 require 'gli'
@@ -12,8 +14,11 @@ require 'open-uri'
 require 'elixirize'
 require 'simple_xlsx_reader'
 require 'pry'
+require 'fuzzy_match'
+require 'amatch'
 require 'lib/transmission'
 # require 'config/application'
+
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))
 APP_NAME    = APP_ROOT.basename.to_s
@@ -148,3 +153,4 @@ module Transmission
   exit run(ARGV)
 
 end
+

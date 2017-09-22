@@ -5,7 +5,7 @@ mongo:
   adress: '127.0.0.1'
   ip: '27017'
   # log_level: ::Logger::FATAL
-  log_level: ::Logger::INFO
+  log_level: "::Logger::INFO"
 path:
   download: './excel_file/download/' 
 url:

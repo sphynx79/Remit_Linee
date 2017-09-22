@@ -44,7 +44,7 @@ module Transmission
       end
 
       def config
-        config_url = read_config
+        read_config
         # SITE          = config_url.site
       end
 

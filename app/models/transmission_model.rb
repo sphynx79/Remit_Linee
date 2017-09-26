@@ -1,10 +1,6 @@
-require 'mongo'
-require 'chainable_methods'
 #https://jeffkreeftmeijer.com/2011/method-chaining-and-lazy-evaluation-in-ruby/
 
 HOUR_STEP   = (1.to_f/24)
-# Mongo::Logger.logger.level = env[:config].mongo["log_level"]
-# Mongo::Logger.logger.level = ::Logger::INFO
 
 class TransmissionModel < Transmission::BaseModel
 

@@ -32,8 +32,10 @@ module Transmission
         client.database_names
         client
       rescue Mongo::Error::NoServerAvailable => e
-        puts 'Cannot connect to the server'
-        puts 'Controllare in config che IP, PORTA, NOME database siano corretti'
+        puts 'Cannot connect to the server:'
+        puts '1) Controllare che il server mongodb sia avviato'
+        puts '2) Controllare in config che IP, PORTA, NOME database siano corretti'
+        exit!
         # Error.report_error('Cannot connect to the server')
       end
     end

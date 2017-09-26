@@ -12,7 +12,6 @@ module Transmission
 
       render_template do 
         begin
-          p action_view
         Object.const_get(action_view).call()
         rescue
           p "action: #{action_view} non esiste"

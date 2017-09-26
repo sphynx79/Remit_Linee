@@ -2,8 +2,6 @@
 
 $LOAD_PATH.unshift '.'
 
-RubyVM::InstructionSequence.compile_option = { tailcall_optimization: true, trace_instruction: false }
-
 require 'active_support/core_ext/string/inflections'
 require 'pathname'
 require 'gli'
@@ -18,7 +16,12 @@ require 'fuzzy_match'
 require 'amatch'
 require 'settingslogic'
 require 'yell'
+require 'deterministic'
+# @todo: vedere se lasciare maybe se mi serve
+require 'deterministic/maybe'
 require 'lib/transmission'
+
+FuzzyMatch.engine = :amatch
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))
 APP_NAME    = APP_ROOT.basename.to_s

@@ -4,10 +4,10 @@
 require 'zlog'
 Log = Logging.logger["main"]
 Zlog::init_stdout loglevel: :debug
-FuzzyMatch.engine = :amatch
 
 class ArchiviaController < Transmission::BaseController
   extend Memoist
+  include Deterministic::Prelude
 
   attr_reader :file
   attr_reader :values
@@ -111,41 +111,39 @@ class ArchiviaController < Transmission::BaseController
 
   def controlla_nome_terna
     # ap db.all_document_from(collection: "transmission")
-    ap db.ᐅ(~:all_document_from, collection: "transmission")
+    # ap db.ᐅ(~:all_document_from, collection: "transmission")
 
     remit_terna.each do |row|
+      row.freeze
       nome = row[:nome]
-      if exist_in_db(nome_terna: nome)
-        Log.debug "nome_terna: #{nome} gia presente nel db"
-      else
-        Log.debug "nome_terna: #{nome} non presente a db"
-        id_transmission = search_id_transmission(nome)
-        # salva_nome_terna_in_db(id_transmission, nome) if id_transmission
+      docs = []
+
+      result = in_sequence do
+        get(:id)   { trova_transmission_id(nome_terna: nome) }
+        get(:doc)  { merge_row_and_id(row, id)               }
+        get(:_)    { archivia_linea(doc)                     }
+        # observe     { log('info', msg) }
+        # and_then    { change_env_path  }
+        # get(:msg)   { create_tags      }
+        # observe     { log('info', msg) }
+        # get(:msg)   { create_gems_tags }
+        # observe     { log('info', msg) }
+        and_yield   { Success("Fine controllo nome terna ") }
       end
+
+      Log.error(result.to_s) if result.failure?
+
+      # if exist_in_db(nome_terna: nome)
+      #   Log.debug "nome_terna: #{nome} gia presente nel db"
+      # else
+      #   Log.debug "nome_terna: #{nome} non presente a db"
+      #   id_transmission = search_id_transmission(nome)
+      #   # salva_nome_terna_in_db(id_transmission, nome) if id_transmission
+      # end
+
     end
   end
 
-  def search_id_transmission(nome)
-    Log.section "Cerco l'id della linea che corrisponde al nome di terna"
-
-    id_terna, nome_clean = clean_name(nome)
-    Log.debug "id_terna: #{id_terna}"
-    Log.debug "nome: #{nome}".rjust(5)
-
-    f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
-    trovato = f.find_with_score(nome_clean)
-    if trovato.nil?
-      Log.error "Non trovo nessuna linea"
-      nil
-    elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
-      Log.error "Trovato: #{trovato[0].dig("properties","nome")}"
-      Log.error "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}"
-      nil
-    else
-      Log.debug "Trovato: " + trovato[0].dig("properties","nome")
-      trovato[0]["_id"]
-    end
-  end
 
   def clean_name(nome)
     nome = nome.dup
@@ -160,13 +158,59 @@ class ArchiviaController < Transmission::BaseController
     return id.to_s, nome
   end
 
-  def exist_in_db(nome_terna:)
-    Log.section "Controllo se il nome esiste gia a db"
-    !coll_transmission.
+ 
+  def trova_transmission_id(nome_terna:)
+    Log.section "Cerco l'id della linea nel db transmission"
+
+    docs = coll_transmission.
       ᐅ(~:find, {"properties.nome_terna" => nome_terna}).
       ᐅ(~:limit, 1).
-      ᐅ(~:to_a).
-      ᐅ(~:empty?)
+      ᐅ(~:to_a)
+
+    if docs.empty?
+      Log.warn "Per #{nome_terna} non ho trovato nessun id"
+      cerca_possibili_id(nome_terna)
+    else
+      id = transmission_id(docs)
+      Log.ok "Trovato per #{nome_terna} => #{id}"
+      Success(id)
+    end
+  end
+
+  def archivia_linea(doc)
+    Log.debug "Archivio la linea a db"
+    Success(0)
+  end
+
+  def merge_row_and_id(row, id)
+    try! {row.dup.merge({id_transmission: id})}
+  end
+
+  def cerca_possibili_id(nome)
+    Log.warn "Cerco nel db i possibili id che possono corrispondere al nome"
+    # id_terna, nome_clean = clean_name(nome)
+    # Log.debug "id_terna: #{id_terna}"
+    # Log.debug "nome: #{nome}".rjust(5)
+    #
+    # f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+    # trovato = f.find_with_score(nome_clean)
+    # if trovato.nil?
+    #   Log.error "Non trovo nessuna linea"
+    #   nil
+    # elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
+    #   Log.error "Trovato: #{trovato[0].dig("properties","nome")}"
+    #   Log.error "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}"
+    #   nil
+    # else
+    #   Log.debug "Trovato: " + trovato[0].dig("properties","nome")
+    #   trovato[0]["_id"]
+    # end
+    Success(0)
+
+  end
+
+  def transmission_id(docs)
+    docs[0]["_id"]
   end
 
   def all_line
@@ -181,11 +225,14 @@ class ArchiviaController < Transmission::BaseController
     db.collection(collection: "transmission")
   end
 
+  def log(level, message)
+    Log.send(level, message)
+  end
+
   memoize :dt_upd
   memoize :db
   memoize :remit_terna
   memoize :coll_transmission
   memoize :all_line
-
 
 end

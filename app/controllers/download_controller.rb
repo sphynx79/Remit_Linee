@@ -3,17 +3,17 @@ class DownloadController < Transmission::BaseController
 
     def start
       if file_to_download_exist?
-        p "il file esiste"
+        p "il file esiste" if $INTERFACE != "scheduler"
+        exit! 2
       else
         p "il file non esiste: scarico"
         download_file
+        render if $INTERFACE != "scheduler"
       end
-      render
 
     end
 
     private 
-
   
     def file_to_download_exist?
       File.exist?(local_file) ? true : false

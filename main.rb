@@ -68,6 +68,8 @@ module Transmission
     if global[:enviroment] == "development"
       set_development
     end
+    # @todo: vedere se usare questa variabile o trovare modo piu elegante
+    $INTERFACE = global[:interface]
     init_log(global[:verbose])
     set_env(command, global, options)
     Transmission::Initialization.call()
@@ -145,7 +147,16 @@ module Transmission
             }
   end
 
-  exit run(ARGV)
+
+  # Controllo se lo sto lanciandi come programma
+  # oppure il file è stato usato come require
+  if __FILE__ == $0
+   exit run(ARGV)
+  end
+
+
+
 
 end
+
 

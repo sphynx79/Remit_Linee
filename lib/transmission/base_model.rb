@@ -28,7 +28,7 @@ module Transmission
         client   = Mongo::Client.new(["#{adress}:#{port}"],
                                    database: database,
                                    server_selection_timeout: 5,
-                                   :write => {:w => 0, :j => false}) #setto la modalità unacknowledged
+                                   :write => {:w => 1, :j => false}) #@todo vedere se mettere w => 0, setto la modalità unacknowledged
         client.database_names
         client
       rescue Mongo::Error::NoServerAvailable => e

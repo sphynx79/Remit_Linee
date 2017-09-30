@@ -5,7 +5,9 @@ defaults: &defaults
     port: '27018'
     log_level: "::Logger::INFO"
   path:
-    download: './excel_file/download/'
+    download: './excel_file/'
+    archivio: './excel_file/Archivio/'
+    partial:  './excel_file/Partial/'
   url:
     site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
 

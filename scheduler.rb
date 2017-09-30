@@ -3,7 +3,6 @@
 # warn_indent: true
 # frozen_string_literal: true
 
-
 require 'rufus-scheduler'
 require 'logger'
 require 'open3'
@@ -12,6 +11,8 @@ require 'pry'
 $logger = Logger.new(STDOUT)
 $logger.level = Logger::DEBUG
 # $logger.level = Logger::WARN
+# STDOUT.sync = true
+# STDERR.sync = true
 
 $logger.formatter = proc do |severity, datetime, _progname, msg|
       "[#{datetime.strftime('%Y-%m-%d %H:%M:%S')}] #{severity}: #{msg}\n"
@@ -23,7 +24,7 @@ class Handler
   attr_reader :actions
 
   def initialize(actions: nil)
-    @actions      = actions
+    @actions = actions
   end
 
   def call(job)
@@ -44,7 +45,6 @@ class Handler
       end
 
   end
-
 
   def process_is_ok(action)
     exit_status, err, out = start_process(action)
@@ -72,9 +72,7 @@ class Handler
     return  wait_thr.exitstatus, stderr, stdout
   end
 
-
 end
-
 
 # @todo diminuire la frequenza di rufus-scheduler
 scheduler = Rufus::Scheduler.new(:frequency => "5s")
@@ -85,7 +83,7 @@ end
 
 task = Handler.new(actions: ["download", "archivia"])
 
-scheduler.every('10s', task, :timeout => '5m', :tag  => 'task')
+scheduler.every('30s', task, :timeout => '5m', :tag  => 'task')
 
 puts "Start Scheduler"
 

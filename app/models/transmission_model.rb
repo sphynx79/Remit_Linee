@@ -15,6 +15,7 @@ class TransmissionModel < Transmission::BaseModel
       ᐅ(~:to_a)
   end
 
+ 
   # def all_document_from(collection: "transmission")
   #   (client[collection])
   #     .find({})

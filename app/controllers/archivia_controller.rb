@@ -13,13 +13,12 @@ class ArchiviaController < Transmission::BaseController
     # tutti e legge quelli non letti
     @file         = lista_file.last
     @no_archivate = []
-    # Transmission::BaseMail.send("prova")
 
     remit_terna.each do |row|
       row.freeze
       nome_terna = row[:nome]
 
-      result = in_sequence do
+      archivia = in_sequence do
         get(:id_trovato)   { transmission_id(nome_terna)                           }
         get(:id)           { id_trovato ? Success(id_trovato) : possibili_id(row)  }
         get(:ui)           { unique_id(row)                                        }
@@ -29,8 +28,15 @@ class ArchiviaController < Transmission::BaseController
         and_yield          { Success("Archiviata con successo")                    }
       end
 
-      logger.error(result.to_s) if result.failure?
+      logger.error(archivia.to_s) if archivia.failure?
     end
+
+    sposta_file
+
+
+
+
+
 
     message = "\n"
     @no_archivate.each do |k|
@@ -48,6 +54,22 @@ class ArchiviaController < Transmission::BaseController
   end
 
   private
+  ######################################
+  #      METODI UTILIZZO VARIO         #
+  ######################################
+
+  #
+  # Sposta il file della remit
+  # se qualche remit non è stata letta lo sposta in Partial
+  # o se no lo sposta in archivio
+  #
+  def sposta_file
+     folder    = @no_archivate.empty? ? Transmission::Config.path.archivio : Transmission::Config.path.partial
+     file_name = @file.split("/").last
+     dest      =  folder + file_name
+     binding.pry 
+     FileUtils.mv @file, dest
+  end
 
   ######################################
   #  METODI PER LETTURA FILE REMIT     #
@@ -151,7 +173,7 @@ class ArchiviaController < Transmission::BaseController
       ᐅ(~:limit, 1).
       ᐅ(~:to_a)
 
-    if docs.empty?
+    if doc.empty?
       logger.debug "Per #{nome_terna} non ho trovato nessun id"
       Success(nil)
     else
@@ -271,7 +293,7 @@ class ArchiviaController < Transmission::BaseController
   # Mi estrae l'id dal documento 
   #
   def doc_id(doc)
-    docs[0]["_id"]
+    doc[0]["_id"]
   end
 
   #

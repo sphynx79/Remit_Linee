@@ -139,23 +139,14 @@ class ArchiviaController < Transmission::BaseController
   #    METODI PER ARCHVIAZIONE A DB    #
   ######################################
 
-  def clean_name(nome)
-    nome = nome.dup
-    nome.downcase!
-    nome.sub!("linea 400 kv ", "")
-    nome.sub!("linea ", "")
-    id = nome.match(/\d{3}/)
-    id = id.nil? ? "" : id[0]
-    # nome.sub!(id, "")
-    nome.sub!(/l\s/, "")
-    nome.strip!
-    return id.to_s, nome
-  end
-
+  #
+  # Cerca nell collezione transmission il nome della linea
+  # se lo trova mi restituisce l'id altrimenti nil
+  #
   def transmission_id(nome_terna)
     logger.debug "Cerco l'id della linea nel db transmission"
 
-    docs = coll_transmission.
+    doc = coll_transmission.
       ᐅ(~:find, {"properties.nome_terna" => nome_terna}).
       ᐅ(~:limit, 1).
       ᐅ(~:to_a)
@@ -164,13 +155,17 @@ class ArchiviaController < Transmission::BaseController
       logger.debug "Per #{nome_terna} non ho trovato nessun id"
       Success(nil)
     else
-      id = doc_id(docs)
+      id = doc_id(doc)
       logger.debug "Trovato per #{nome_terna} => #{id}"
       Success(id)
     end
   end
-
+  
+  #
+  # Inserisce in documento nel db remit
+  #
   # @todo: migliorare perfomnce per inserire piu doc in un momento
+  #
   def archivia(doc)
     result = coll_remit.insert_one(doc)
     # fare il check se riuscito a salvare la linea usando result
@@ -179,17 +174,28 @@ class ArchiviaController < Transmission::BaseController
     Success(0)
   end
 
+  #
+  # Controlla nel db remit se ho già una remit uguale
+  #
   def check_exist_in_db(unique_id)
     exist = coll_remit.find({ unique_id: unique_id }).limit(1).first
     exist ? Failure("Remit gia presente a db") : Success(0)
   end
 
+  #
+  # Mi crea il mio doc aggiungendo alla riga che ha letto dall'excel
+  # id_transmission e unique_id
+  #
   # @todo: vedere se è meglio creare una stinga base64 fare una query su piu campi
   # per le performance
+  #
   def make_doc(row, id, unique_id)
     try! {row.dup.merge({id_transmission: id, unique_id: unique_id})}
   end
 
+  #
+  # Concatena dt_upd start_dt end_dt nome, e mi crea un id univoco in base64
+  #
   def unique_id(row)
     try! {
       dt_upd     = row[:dt_upd].strftime("%d/%m/%Y")
@@ -200,6 +206,9 @@ class ArchiviaController < Transmission::BaseController
     }
   end
 
+  #
+  # Cerca nel db transmission le linee che potrebbere matchare con il nome
+  #
   def possibili_id(row)
     logger.info "Cerco nel db i possibili id che possono corrispondere al nome"
     nome = row[:nome]
@@ -240,6 +249,9 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
+  #
+  # Chiede all'utente se vuole salvare il nome di terna nel db transmission
+  #
   def salva_nome_terna(id_transmission, nome)
     prompt = TTY::Prompt.new
     response = prompt.ask('Vuoi salvare il nome della linea?', default: 'Si')
@@ -255,26 +267,61 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def doc_id(docs)
+  #
+  # Mi estrae l'id dal documento 
+  #
+  def doc_id(doc)
     docs[0]["_id"]
   end
 
+  #
+  # Mi restituisce tutti i documenti presneti nel db transmission
+  #
   def all_line
     db.ᐅ(~:all_document_from, collection: "transmission")
   end
 
+  #
+  # Prende il nome della linea che ha letto dall'excel e fa un sanitizze
+  # e mi restitusce l'id e il nome della linea
+  #
+  def clean_name(nome)
+    nome = nome.dup
+    nome.downcase!
+    nome.sub!("linea 400 kv ", "")
+    nome.sub!("linea ", "")
+    id = nome.match(/\d{3}/)
+    id = id.nil? ? "" : id[0]
+    # nome.sub!(id, "")
+    nome.sub!(/l\s/, "")
+    nome.strip!
+    return id.to_s, nome
+  end
+
+  #
+  # Crea un nuovo oggetto TransmissionModel e mi stabilisce la connesione con il db
+  #
   def db
     TransmissionModel.new
   end
 
+  #
+  # Seleziono la collezzione transmission
+  #
   def coll_transmission
     db.collection(collection: "transmission")
   end
 
+  #
+  # Seleziono la collezzione remit 
+  #
   def coll_remit
     db.collection(collection: "remit")
   end
 
+  #
+  # Mi stampa un log 
+  #
   def log(level, message)
     logger.send(level, message)
   end

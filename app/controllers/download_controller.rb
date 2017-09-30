@@ -10,7 +10,6 @@ class DownloadController < Transmission::BaseController
         download_file
         render if $INTERFACE != "scheduler"
       end
-
     end
 
     private 

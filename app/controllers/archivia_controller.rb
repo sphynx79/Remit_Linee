@@ -1,44 +1,50 @@
 # frozen_string_literal: true
 
-# @todo: eliminare zlog e usare yell
-require 'zlog'
-# Zlog::init_stdout loglevel: :warn
-Zlog::init_stdout loglevel: :debug
-Log = Logging.logger["main"]
-
 class ArchiviaController < Transmission::BaseController
   extend Memoist
   include Deterministic::Prelude
+  include Deterministic::Prelude::Option
 
   attr_reader :file
   attr_reader :values
 
   def start
-    # @todo: per ora prendo l'ultimo ma devo fare la logica che li scansiona
+    # @todo: per ora prendo l'ultimo ma devo fare che li scansiona
     # tutti e legge quelli non letti
-    @file        = lista_file.last
+    @file         = lista_file.last
+    @no_archivate = []
+    # Transmission::BaseMail.send("prova")
 
     remit_terna.each do |row|
       row.freeze
       nome_terna = row[:nome]
 
       result = in_sequence do
-        get(:id)        { transmission_id(nome_terna) }
-        get(:ui)        { make_unique_id(row)         }
-        and_then        { check_exist_in_db(ui)       }
-        get(:doc)       { make_doc(row, id, ui)       }
-        and_then        { archivia(doc)               }
-        # observe     { log('info', msg) }
-        # and_then    { change_env_path  }
-        # get(:msg)   { create_tags      }
-        # observe     { log('info', msg) }
-        # get(:msg)   { create_gems_tags }
-        # observe     { log('info', msg) }
-        and_yield   { Success("Fine controllo nome terna ") }
+        get(:id_trovato)   { transmission_id(nome_terna)                           }
+        get(:id)           { id_trovato ? Success(id_trovato) : possibili_id(row)  }
+        get(:ui)           { unique_id(row)                                        }
+        and_then           { check_exist_in_db(ui)                                 }
+        get(:doc)          { make_doc(row, id, ui)                                 }
+        and_then           { archivia(doc)                                         }
+        and_yield          { Success("Archiviata con successo")                    }
       end
 
-      Log.error(result.to_s) if result.failure?
+      logger.error(result.to_s) if result.failure?
     end
+
+    message = "\n"
+    @no_archivate.each do |k|
+      message += "Nome:            #{k[:nome]}\n"
+      message += "dt_upd:          #{k[:dt_upd]}\n"
+      message += "start_dt:        #{k[:start_dt]}\n"
+      message += "end_dt:          #{k[:end_dt]}\n"
+      message += "reason:          #{k[:reason]}\n"
+      message += "possibile_match: #{k[:possibile_match]}" + "\n"
+      message += "\n##############################################################\n"
+      message += "\n"
+    end
+
+    Transmission::BaseMail.send(message)
   end
 
   private
@@ -147,20 +153,19 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def transmission_id(nome_terna)
-    Log.section "Cerco l'id della linea nel db transmission"
+    logger.debug "Cerco l'id della linea nel db transmission"
 
     docs = coll_transmission.
       ᐅ(~:find, {"properties.nome_terna" => nome_terna}).
       ᐅ(~:limit, 1).
       ᐅ(~:to_a)
 
-    # Sono arrivato qua che mi deve chiedere cosa fare
     if docs.empty?
-      Log.warn "Per #{nome_terna} non ho trovato nessun id"
-      cerca_possibili_id(nome_terna)
+      logger.debug "Per #{nome_terna} non ho trovato nessun id"
+      Success(nil)
     else
       id = doc_id(docs)
-      Log.ok "Trovato per #{nome_terna} => #{id}"
+      logger.debug "Trovato per #{nome_terna} => #{id}"
       Success(id)
     end
   end
@@ -170,12 +175,12 @@ class ArchiviaController < Transmission::BaseController
     result = coll_remit.insert_one(doc)
     # fare il check se riuscito a salvare la linea usando result
     # result.n
-    Log.debug "Archivio la linea a db"
+    logger.debug "Archivio la linea a db"
     Success(0)
   end
 
   def check_exist_in_db(unique_id)
-    exist = coll_remit.find( { unique_id: unique_id } ).limit(1).first
+    exist = coll_remit.find({ unique_id: unique_id }).limit(1).first
     exist ? Failure("Remit gia presente a db") : Success(0)
   end
 
@@ -185,7 +190,7 @@ class ArchiviaController < Transmission::BaseController
     try! {row.dup.merge({id_transmission: id, unique_id: unique_id})}
   end
 
-  def make_unique_id(row)
+  def unique_id(row)
     try! {
       dt_upd     = row[:dt_upd].strftime("%d/%m/%Y")
       start_dt   = row[:start_dt].strftime("%d/%m/%Y")
@@ -195,27 +200,58 @@ class ArchiviaController < Transmission::BaseController
     }
   end
 
-  def cerca_possibili_id(nome)
-    Log.warn "Cerco nel db i possibili id che possono corrispondere al nome"
+  def possibili_id(row)
+    logger.info "Cerco nel db i possibili id che possono corrispondere al nome"
+    nome = row[:nome]
+    row  = row.dup 
     id_terna, nome_clean = clean_name(nome)
-    Log.debug "id_terna: #{id_terna}"
-    Log.debug "nome: #{nome}".rjust(5)
+    logger.info "id_terna: #{id_terna}"
+    logger.info "nome: #{nome}".rjust(5)
 
     f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
     trovato = f.find_with_score(nome_clean)
     if trovato.nil?
-      Log.error "Non trovo nessuna linea"
-      nil
-      Failure "Questa remit non viene archiviata a DB"
+      logger.warn "Non trovo nessuna linea"
+      row[:possibile_match] = 'nessuno'
+      @no_archivate << row
+      Failure("Questa remit non viene archiviata a DB")
     elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
-      Log.error "Trovato: #{trovato[0].dig("properties","nome")}"
-      Log.error "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}"
-      nil
-      Success(0)
+      logger.warn "Trovato: #{trovato[0].dig("properties","nome")}"
+      logger.warn "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}"
+      row[:possibile_match] = 'nessuno'
+      @no_archivate << row
+      Failure("Questa remit non viene archiviata a DB")
     else
-      Log.debug "Trovato: " + trovato[0].dig("properties","nome")
-      trovato[0]["_id"]
-      Success(0)
+      possibile_match       = trovato[0].dig("properties","nome")
+      row[:possibile_match] = possibile_match
+      logger.info "Trovato: " + possibile_match
+      if $INTERFACE == "scheduler"
+        @no_archivate << row
+        Failure("Questa remit non viene archiviata a DB")
+      else
+        id_transmission = trovato[0]["_id"]
+        if salva_nome_terna(id_transmission, nome)
+          Success(id_transmission)
+        else
+          @no_archivate << row
+          Failure("Utente non vuole salvare il nome della linea a DB")
+        end
+      end
+    end
+  end
+
+  def salva_nome_terna(id_transmission, nome)
+    prompt = TTY::Prompt.new
+    response = prompt.ask('Vuoi salvare il nome della linea?', default: 'Si')
+    return false if response != "Si"
+    logger.debug "Salvo il nome_terna a db"
+    doc  = coll_transmission.find({_id: id_transmission}).limit(1)
+    array_nome_terna_size = doc.first.dig("properties","nome_terna").size
+    logger.info "Attenzione questa linee ha gia #{array_nome_terna_size} nomi" if array_nome_terna_size > 0
+
+    result = doc.update_one({'$addToSet' => {"properties.nome_terna": nome}})
+    if result.modified_count == 1
+      logger.debug "nome_terna #{nome} salvato nel db"
     end
   end
 
@@ -240,7 +276,7 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def log(level, message)
-    Log.send(level, message)
+    logger.send(level, message)
   end
 
   memoize :dt_upd

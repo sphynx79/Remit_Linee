@@ -20,6 +20,8 @@ require 'deterministic'
 # @todo: vedere se lasciare maybe se mi serve
 require 'deterministic/maybe'
 require 'lib/transmission'
+require 'tty-prompt'
+require 'mail'
 
 FuzzyMatch.engine = :amatch
 
@@ -92,10 +94,10 @@ module Transmission
   end
 
   def init_log(level)
-    level = level ? "debug" : "info"
+    level = level ? "debug" : "error"
     Yell.new(name: Object, format: false) do |l|
-      l.adapter STDOUT, colors: true, level: "gte.#{level} lte.warn"
-      l.adapter STDERR, colors: true, level: 'gte.error', format: false
+      l.adapter STDOUT, colors: true, level: "gte.#{level} lte.error"
+      l.adapter STDERR, colors: true, level: 'gte.fatal'
     end
     # Yell.new(name: 'scheduler', format: Yell.format('%d: %m', '%d-%m-%Y %H:%M')) do |l|
     #   l.adapter STDOUT, colors: false, level: 'at.warn'

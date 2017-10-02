@@ -83,7 +83,7 @@ end
 
 task = Handler.new(actions: ["download", "archivia"])
 
-scheduler.every('30s', task, :timeout => '5m', :tag  => 'task')
+scheduler.every('50s', task, :timeout => '5m', :tag  => 'task')
 
 puts "Start Scheduler"
 

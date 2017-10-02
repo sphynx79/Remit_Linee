@@ -21,13 +21,14 @@ require 'deterministic'
 require 'deterministic/maybe'
 require 'lib/transmission'
 require 'tty-prompt'
-require 'mail'
+require 'net/smtp'
 
 FuzzyMatch.engine = :amatch
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))
 APP_NAME    = APP_ROOT.basename.to_s
 APP_VERSION = "1"
+ENV['GLI_DEBUG'] = 'false'
 
 module Transmission
   include GLI::App
@@ -43,7 +44,7 @@ module Transmission
   desc 'Setto se lanciarlo in verbose mode'
   switch %i[v verbose]
 
-  desc 'Interfaccia da usare [gui, cli, scheluder]'
+  desc 'Interfaccia da usare [gui, cli, scheduler]'
   default_value 'cli'
   flag %i[i interface], required: false
 
@@ -148,7 +149,6 @@ module Transmission
             command_options:  options,
             }
   end
-
 
   # Controllo se lo sto lanciandi come programma
   # oppure il file è stato usato come require

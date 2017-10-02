@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+STDOUT.sync = true
+
 class ArchiviaController < Transmission::BaseController
   extend Memoist
   include Deterministic::Prelude
@@ -14,7 +16,10 @@ class ArchiviaController < Transmission::BaseController
     @file         = lista_file.last
     @no_archivate = []
 
+    exit! unless file_exist?
+
     remit_terna.each do |row|
+      logger.debug "#"*80+"\n"
       row.freeze
       nome_terna = row[:nome]
 
@@ -28,32 +33,16 @@ class ArchiviaController < Transmission::BaseController
         and_yield          { Success("Archiviata con successo")                    }
       end
 
-      logger.error(archivia.to_s) if archivia.failure?
+      logger.error(archivia.to_s) if (archivia.failure?) && ($INTERFACE != "scheduler")
     end
 
     sposta_file
 
-
-
-
-
-
-    message = "\n"
-    @no_archivate.each do |k|
-      message += "Nome:            #{k[:nome]}\n"
-      message += "dt_upd:          #{k[:dt_upd]}\n"
-      message += "start_dt:        #{k[:start_dt]}\n"
-      message += "end_dt:          #{k[:end_dt]}\n"
-      message += "reason:          #{k[:reason]}\n"
-      message += "possibile_match: #{k[:possibile_match]}" + "\n"
-      message += "\n##############################################################\n"
-      message += "\n"
-    end
-
-    Transmission::BaseMail.send(message)
+    make_report
   end
 
   private
+
   ######################################
   #      METODI UTILIZZO VARIO         #
   ######################################
@@ -64,16 +53,83 @@ class ArchiviaController < Transmission::BaseController
   # o se no lo sposta in archivio
   #
   def sposta_file
-     folder    = @no_archivate.empty? ? Transmission::Config.path.archivio : Transmission::Config.path.partial
-     file_name = @file.split("/").last
-     dest      =  folder + file_name
-     binding.pry 
-     FileUtils.mv @file, dest
+    folder    = @no_archivate.empty? ? Transmission::Config.path.archivio : Transmission::Config.path.partial
+    file_name = @file.split("/").last
+    dest      =  folder + file_name
+    FileUtils.mv @file, dest
+  end
+
+  def make_report
+    html = ''
+    local_vars = @no_archivate.map do |row|
+      row.transform_values! do |v|
+        if v.is_a? DateTime
+          v.strftime("%d/%m/%Y %R")
+        elsif v.is_a? String
+          v.gsub(/linea/i, "")
+        else
+          v
+        end
+ 
+      end
+    end
+    files = ["head", "body", "foot"]
+    files.each {|fn| html +=  eval('%Q(' + File.read("./html/#{fn}.html") + ')') }
+    Transmission::BaseMail.send(html)
+  end
+
+  def css
+    css = <<-EOF
+     <style type="text/css">
+      table {
+      border: 1px solid #1C6EA4;
+      background-color: #EEEEEE;
+      width: 100%;
+      text-align: left;
+      border-collapse: collapse;
+      }
+      table td, table th {
+      border: 1px solid #AAAAAA;
+      padding: 3px 2px;
+      }
+      table tbody td {
+      font-size: 13px;
+      }
+      table tr:nth-child(even) {
+      background: #D0E4F5;
+      }
+      table thead {
+      background: #1C6EA4;
+      background: -moz-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+      background: -webkit-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+      background: linear-gradient(to bottom, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+      border-bottom: 2px solid #444444;
+      }
+      table thead th {
+      font-size: 15px;
+      font-weight: bold;
+      color: #FFFFFF;
+      border-left: 2px solid #D0E4F5;
+      }
+      table thead th:first-child {
+      border-left: none;
+      }
+     </style>
+    EOF
   end
 
   ######################################
   #  METODI PER LETTURA FILE REMIT     #
   ######################################
+
+  def file_exist?
+  if @file.nil?
+       print "non trovo nessun file remit\n"
+       return false
+   end
+  true
+  end
+
 
   #
   # Lista dei file presenti nella cartella download
@@ -182,7 +238,7 @@ class ArchiviaController < Transmission::BaseController
       Success(id)
     end
   end
-  
+
   #
   # Inserisce in documento nel db remit
   #
@@ -201,7 +257,7 @@ class ArchiviaController < Transmission::BaseController
   #
   def check_exist_in_db(unique_id)
     exist = coll_remit.find({ unique_id: unique_id }).limit(1).first
-    exist ? Failure("Remit gia presente a db") : Success(0)
+    exist ? Failure("Ho una remit uguale a db non verra' archiviata") : Success(0)
   end
 
   #
@@ -232,12 +288,12 @@ class ArchiviaController < Transmission::BaseController
   # Cerca nel db transmission le linee che potrebbere matchare con il nome
   #
   def possibili_id(row)
-    logger.info "Cerco nel db i possibili id che possono corrispondere al nome"
+    logger.debug "Cerco nel db i possibili id che possono corrispondere al nome"
     nome = row[:nome]
-    row  = row.dup 
+    row  = row.dup
     id_terna, nome_clean = clean_name(nome)
-    logger.info "id_terna: #{id_terna}"
-    logger.info "nome: #{nome}".rjust(5)
+    # logger.debug "id_terna:     #{id_terna}"
+    logger.debug "nome linea:      #{nome}".rjust(5)
 
     f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
     trovato = f.find_with_score(nome_clean)
@@ -255,7 +311,7 @@ class ArchiviaController < Transmission::BaseController
     else
       possibile_match       = trovato[0].dig("properties","nome")
       row[:possibile_match] = possibile_match
-      logger.info "Trovato: " + possibile_match
+      logger.debug "Trovato a db:    " + possibile_match
       if $INTERFACE == "scheduler"
         @no_archivate << row
         Failure("Questa remit non viene archiviata a DB")
@@ -290,7 +346,7 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
-  # Mi estrae l'id dal documento 
+  # Mi estrae l'id dal documento
   #
   def doc_id(doc)
     doc[0]["_id"]
@@ -335,14 +391,14 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
-  # Seleziono la collezzione remit 
+  # Seleziono la collezzione remit
   #
   def coll_remit
     db.collection(collection: "remit")
   end
 
   #
-  # Mi stampa un log 
+  # Mi stampa un log
   #
   def log(level, message)
     logger.send(level, message)

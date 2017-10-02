@@ -15,7 +15,15 @@ class DownloadController < Transmission::BaseController
     private 
   
     def file_to_download_exist?
-      File.exist?(local_file) ? true : false
+      if File.exist?(local_file)
+        true
+      elsif File.exist?(File.expand_path(Transmission::Config.path.archivio, APP_ROOT)+"/remit_#{data}.xlsx")
+        true
+      elsif File.exist?(File.expand_path(Transmission::Config.path.partial, APP_ROOT)+"/remit_#{data}.xlsx")
+        true
+      else 
+        false
+      end
     end
 
     def download_file

@@ -6,51 +6,8 @@ class DownloadController < Transmission::BaseController
       download_file(row)
     end
 
+    Success(result) >> method(:formatta) >> method(:stampa)
 
-    msg = []
-    result.each do |r|
-      # binding.pry 
-      
-      if r.success?
-        msg << r.value.green
-        # render(msg: msg) if $INTERFACE != "scheduler"
-      else
-        unless r.value.class.ancestors.include? Exception
-          msg << r.value.red
-        else
-          msg << r.value.message.red
-          # @todo: migliore l'output delle eccezioni con pretty_backtrace 
-          # bkt = ""
-          # binding.pry 
-          # r.value.backtrace.select { |v| v =~ /download_controller.rb/ }.each do |x| bkt << x.red end
-          # msg[r.value.message] = bkt
-        end
-      end
-
-
-      # msg = r.success? ? r.value.green :  r.value.red
-      # render(msg: msg) if $INTERFACE != "scheduler"
-    end
-
-    msg.each{|m| render(msg: m) if $INTERFACE != "scheduler"}
-
-
-
-    # unless scaricato_qualcosa(result)
-    #   p "non ho scaricato nessun file" if $INTERFACE != "scheduler"
-    #   exit! 2
-    # else
-    #   render(msg: "File ") if $INTERFACE != "scheduler"
-    # end
-
-    # if file_to_download_exist?
-    #   p "il file esiste" if $INTERFACE != "scheduler"
-    #   exit! 2
-    # else
-    #   p "il file non esiste: scarico"
-    #   download_file
-    #   render if $INTERFACE != "scheduler"
-    # end
   end
 
   private
@@ -119,8 +76,31 @@ class DownloadController < Transmission::BaseController
     try! {rem_file.close}
   end
 
-  def scaricato_qualcosa(result)
-    result.find do |x| x.success? end
+  def formatta(result)
+    msg = []
+    format_result = result.collect do |r|
+      if r.success?
+        msg << r.value.green
+        # render(msg: msg) if $INTERFACE != "scheduler"
+      else
+        unless r.value.class.ancestors.include? Exception
+          msg << r.value.red
+        else
+          msg << r.value.message.red
+          # @todo: migliore l'output delle eccezioni con pretty_backtrace
+          # bkt = ""
+          # binding.pry
+          # r.value.backtrace.select { |v| v =~ /download_controller.rb/ }.each do |x| bkt << x.red end
+          # msg[r.value.message] = bkt
+        end
+      end
+      msg
+    end
+    Success(msg)
+  end
+
+  def stampa(messaggi)
+    Success(messaggi.each{|m| render(msg: m) if $INTERFACE != "scheduler"})
   end
 
   def page

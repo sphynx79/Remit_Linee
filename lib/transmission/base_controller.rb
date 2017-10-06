@@ -6,13 +6,13 @@ module Transmission
       @env = env
     end
 
-    def render(view=controller_action)
+    def render(view=controller_action, msg: nil)
       load layout_path
       load view_path
 
       render_template do 
         begin
-        Object.const_get(action_view).call()
+        Object.const_get(action_view).call(msg)
         rescue
           p "action: #{action_view} non esiste"
         end

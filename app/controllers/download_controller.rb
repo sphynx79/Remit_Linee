@@ -19,11 +19,12 @@ class DownloadController < Transmission::BaseController
   def download_file(row)
     in_sequence do
       get(:data)            { data(row) }
-      get(:path)            { local_path(data) }
+      get(:path)            { file_archivio(data) }
       and_then              { exist_file(path) }
       get(:url)             { url_file(row) }
       get(:rem_file)        { remote_file(url) }
       get(:rem_read)        { remote_read(rem_file) }
+      get(:path)            { local_path(data) }
       get(:local_file)      { open_local(path) }
       and_then              { write_local(local_file, rem_read) }
       and_then              { close(rem_file) }
@@ -43,13 +44,22 @@ class DownloadController < Transmission::BaseController
     }
   end
 
+  def file_archivio(data)
+    Success("#{archivio_path}/remit_#{data}.xlsx")
+  end
+
   def local_path(data)
     Success("#{download_path}/remit_#{data}.xlsx")
   end
 
+  def archivio_path
+    Success("#{download_path}/remit_#{data}.xlsx")
+    local_path(data)
+  end
+
   def exist_file(path)
     nome_file = path.split("/").last
-    File.exist?(path) ? Failure("File #{nome_file} gia' presente") : Success("File #{nome_file} non esiste")
+    File.exist?(path) ? Failure("File #{nome_file} gia' presente in Archivio") : Success("File #{nome_file} non esiste")
   end
 
   def url_file(row)
@@ -111,6 +121,10 @@ class DownloadController < Transmission::BaseController
     File.expand_path(Transmission::Config.path.download, APP_ROOT)
   end
 
+  def archivio_path
+    File.expand_path(Transmission::Config.path.archivio, APP_ROOT)
+  end
+
   def site
     Transmission::Config.url.site
   end
@@ -118,5 +132,6 @@ class DownloadController < Transmission::BaseController
   memoize :site
   memoize :page
   memoize :download_path
+  memoize :archivio_path
 
 end

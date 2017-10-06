@@ -23,6 +23,9 @@ require 'lib/transmission'
 require 'tty-prompt'
 require 'net/smtp'
 
+include Deterministic::Prelude
+include Deterministic::Prelude::Option
+
 FuzzyMatch.engine = :amatch
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))

@@ -1,44 +1,36 @@
 # frozen_string_literal: true
 
-STDOUT.sync = true
+# STDOUT.sync = true
 
 class ArchiviaController < Transmission::BaseController
   extend Memoist
-  include Deterministic::Prelude
-  include Deterministic::Prelude::Option
-
-  attr_reader :file
-  attr_reader :values
 
   def start
     # @todo: per ora prendo l'ultimo ma devo fare che li scansiona
     # tutti e legge quelli non letti
-    @file         = lista_file.last
-    @no_archivate = []
+    @files  = lista_file
+    
 
     exit! unless file_exist?
 
-    remit_terna.each do |row|
-      logger.debug "#"*80+"\n"
-      row.freeze
-      nome_terna = row[:nome]
-
-      archivia = in_sequence do
-        get(:id_trovato)   { transmission_id(nome_terna)                           }
-        get(:id)           { id_trovato ? Success(id_trovato) : possibili_id(row)  }
-        get(:ui)           { unique_id(row)                                        }
-        and_then           { check_exist_in_db(ui)                                 }
-        get(:doc)          { make_doc(row, id, ui)                                 }
-        and_then           { archivia(doc)                                         }
-        and_yield          { Success("Archiviata con successo")                    }
+    result = @files.map do |file|
+      @no_archiviate = []
+      result = in_sequence do
+        get(:remit)   { leggi_remit(file)                                          }
+        and_then      { archivia_remit(remit)                                      }
+        and_then      { sposta_file(file)                                          }
+        and_yield     { Success("Archiviata #{file.split("/").last} con successo") }
       end
 
-      logger.error(archivia.to_s) if (archivia.failure?) && ($INTERFACE != "scheduler")
+      # p leggi_remit(file) >> method(:archivia_remit)
+      # result.success? ? archivia_remit(result.value) : print(result.value)
     end
 
-    sposta_file
+    Success(result) >> method(:formatta) >> method(:stampa)
 
-    make_report
+    # sposta_file
+
+    # make_report
   end
 
   private
@@ -52,16 +44,18 @@ class ArchiviaController < Transmission::BaseController
   # se qualche remit non è stata letta lo sposta in Partial
   # o se no lo sposta in archivio
   #
-  def sposta_file
-    folder    = @no_archivate.empty? ? Transmission::Config.path.archivio : Transmission::Config.path.partial
-    file_name = @file.split("/").last
-    dest      =  folder + file_name
-    FileUtils.mv @file, dest
+  def sposta_file(file)
+    try! do
+      folder    = @no_archiviate.empty? ? Transmission::Config.path.archivio : Transmission::Config.path.partial
+      file_name = file.split("/").last
+      dest      = folder + file_name
+      FileUtils.mv file, dest
+    end
   end
 
   def make_report
     html = ''
-    local_vars = @no_archivate.map do |row|
+    local_vars = @no_archiviate.map do |row|
       row.transform_values! do |v|
         if v.is_a? DateTime
           v.strftime("%d/%m/%Y %R")
@@ -70,7 +64,6 @@ class ArchiviaController < Transmission::BaseController
         else
           v
         end
- 
       end
     end
     files = ["head", "body", "foot"]
@@ -118,18 +111,54 @@ class ArchiviaController < Transmission::BaseController
     EOF
   end
 
+  def formatta(result)
+    msg = []
+    format_result = result.collect do |r|
+      if r.success?
+        msg << r.value.green
+        # render(msg: msg) if $INTERFACE != "scheduler"
+      else
+        unless r.value.class.ancestors.include? Exception
+          msg << r.value.red
+        else
+          msg << r.value.message.red
+          # @todo: migliore l'output delle eccezioni con pretty_backtrace
+          # bkt = ""
+          # binding.pry
+          # r.value.backtrace.select { |v| v =~ /download_controller.rb/ }.each do |x| bkt << x.red end
+          # msg[r.value.message] = bkt
+        end
+      end
+      msg
+    end
+    Success(msg)
+  end
+
+  def stampa(messaggi)
+    Success(messaggi.each{|m| render(msg: m) if $INTERFACE != "scheduler"})
+  end
+
   ######################################
   #  METODI PER LETTURA FILE REMIT     #
   ######################################
 
-  def file_exist?
-  if @file.nil?
-       print "non trovo nessun file remit\n"
-       return false
-   end
-  true
+  def leggi_remit(file)
+    in_sequence do
+      get(:xlsx)      { open_xlsx(file)            }
+      get(:sheet)     { get_sheet(xlsx)            }
+      get(:dt_upd)    { get_dt_upd(file)           }
+      get(:value)     { get_values(sheet, dt_upd)  }
+      and_yield       { Success(value)             }
+    end
   end
 
+  def file_exist?
+    if @files.empty?
+      print "non trovo nessun file remit\n"
+      return false
+    end
+    true
+  end
 
   #
   # Lista dei file presenti nella cartella download
@@ -143,18 +172,20 @@ class ArchiviaController < Transmission::BaseController
   #
   # @return [Array<Hash>] ogni riga e un elemento del mio array
   #
-  def remit_terna
-    sheet.map do |row|
-      nome       = row[0]
-      volt       = row[2]
-      start_date = row[3]
-      start_time = row[4]
-      end_date   = row[5]
-      end_time   = row[6]
-      reason     = row[8]
-      start_dt   = to_datetime(start_date, start_time)
-      end_dt     = to_datetime(end_date, end_time)
-      {nome: nome, volt: 380, dt_upd: dt_upd, start_dt: start_dt, end_dt: end_dt, reason: reason}
+  def get_values(sheet, dt_upd)
+    try! do
+      sheet.map do |row|
+        nome       = row[0]
+        volt       = row[2]
+        start_date = row[3]
+        start_time = row[4]
+        end_date   = row[5]
+        end_time   = row[6]
+        reason     = row[8]
+        start_dt   = to_datetime(start_date, start_time)
+        end_dt     = to_datetime(end_date, end_time)
+        {nome: nome, volt: volt, dt_upd: dt_upd, start_dt: start_dt, end_dt: end_dt, reason: reason}
+      end
     end
   end
 
@@ -166,14 +197,14 @@ class ArchiviaController < Transmission::BaseController
   #
   # @return[Array<Array>]
   #
-  def sheet
+  def get_sheet(file)
     filter = ->(row) {row[1] == "LIN" &&  row[2] == "400 kV"}
-    sheet  = file_xlsx.
+    try! do file.
       ᐅ(~:sheets).
       ᐅ(~:first).
       ᐅ(~:rows).
       ᐅ(~:drop, 5).
-      ᐅ(~:keep_if, &filter)
+      ᐅ(~:keep_if, &filter)     end
   end
 
   #
@@ -181,8 +212,8 @@ class ArchiviaController < Transmission::BaseController
   #
   # @return[SimpleXlsxReader::Document]
   #
-  def file_xlsx
-    SimpleXlsxReader.open(@file)
+  def open_xlsx(file)
+    try! {SimpleXlsxReader.open(file)}
   end
 
   #
@@ -204,18 +235,42 @@ class ArchiviaController < Transmission::BaseController
   #
   # @return[DateTime]
   #
-  def dt_upd
-    to_datetime =  ->(string) { DateTime.strptime(string,"%Y_%m_%d") }
-    @file.
-      ᐅ(~:split, '/').
-      ᐅ(~:last).
-      ᐅ(~:gsub, /remit_|.xlsx/i, "").
-      ᐅ(to_datetime)
+  def get_dt_upd(file)
+    try! do
+      to_datetime =  ->(string) { DateTime.strptime(string,"%Y_%m_%d") }
+      file.
+        ᐅ(~:split, '/').
+        ᐅ(~:last).
+        ᐅ(~:gsub, /remit_|.xlsx/i, "").
+        ᐅ(to_datetime)
+    end
   end
 
   ######################################
   #    METODI PER ARCHVIAZIONE A DB    #
   ######################################
+
+  def archivia_remit(remit_terna)
+    try! do
+      remit_terna.each do |row|
+        logger.debug "#"*80+"\n"
+        row.freeze
+        nome_terna = row[:nome]
+
+        archivia = in_sequence do
+          get(:id_trovato)   { transmission_id(nome_terna)                           }
+          get(:id)           { id_trovato ? Success(id_trovato) : possibili_id(row)  }
+          get(:ui)           { unique_id(row)                                        }
+          and_then           { check_exist_in_db(ui)                                 }
+          get(:doc)          { make_doc(row, id, ui)                                 }
+          and_then           { archivia(doc)                                         }
+          and_yield          { Success("Archiviata con successo")                    }
+        end
+
+        logger.warn(archivia.to_s) if (archivia.failure?) && ($INTERFACE != "scheduler")
+      end
+    end
+  end
 
   #
   # Cerca nell collezione transmission il nome della linea
@@ -240,12 +295,55 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
+  # Cerca nel db transmission le linee che potrebbere matchare con il nome
+  #
+  def possibili_id(row)
+    logger.debug "Cerco nel db i possibili id che possono corrispondere al nome"
+    nome = row[:nome]
+    row  = row.dup
+    id_terna, nome_clean = clean_name(nome)
+    # logger.debug "id_terna:     #{id_terna}"
+    logger.debug "nome linea:      #{nome}".rjust(5)
+
+    f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+    trovato = f.find_with_score(nome_clean)
+    if trovato.nil?
+      logger.info "Non trovo nessuna linea"
+      row[:possibile_match] = 'nessuno'
+      @no_archiviate << row
+      Failure("Questa remit non viene archiviata a DB")
+    elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
+      logger.info "Trovato: #{trovato[0].dig("properties","nome")}"
+      logger.info "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}"
+      row[:possibile_match] = 'nessuno'
+      @no_archiviate << row
+      Failure("Questa remit non viene archiviata a DB")
+    else
+      possibile_match       = trovato[0].dig("properties","nome")
+      row[:possibile_match] = possibile_match
+      logger.debug "Trovato a db:    " + possibile_match
+      if $INTERFACE == "scheduler"
+        @no_archiviate << row
+        Failure("Questa remit non viene archiviata a DB")
+      else
+        id_transmission = trovato[0]["_id"]
+        if salva_nome_terna(id_transmission, nome)
+          Success(id_transmission)
+        else
+          @no_archiviate << row
+          Failure("Utente non vuole salvare il nome della linea a DB")
+        end
+      end
+    end
+  end
+
+  #
   # Inserisce in documento nel db remit
   #
   # @todo: migliorare perfomnce per inserire piu doc in un momento
   #
   def archivia(doc)
-    result = coll_remit.insert_one(doc)
+    # result = coll_remit.insert_one(doc)
     # fare il check se riuscito a salvare la linea usando result
     # result.n
     logger.debug "Archivio la linea a db"
@@ -282,49 +380,6 @@ class ArchiviaController < Transmission::BaseController
       nome       = row[:nome]
       Base64.strict_encode64(nome + "-" + dt_upd + "-" + start_dt + "-" + end_dt)
     }
-  end
-
-  #
-  # Cerca nel db transmission le linee che potrebbere matchare con il nome
-  #
-  def possibili_id(row)
-    logger.debug "Cerco nel db i possibili id che possono corrispondere al nome"
-    nome = row[:nome]
-    row  = row.dup
-    id_terna, nome_clean = clean_name(nome)
-    # logger.debug "id_terna:     #{id_terna}"
-    logger.debug "nome linea:      #{nome}".rjust(5)
-
-    f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
-    trovato = f.find_with_score(nome_clean)
-    if trovato.nil?
-      logger.warn "Non trovo nessuna linea"
-      row[:possibile_match] = 'nessuno'
-      @no_archivate << row
-      Failure("Questa remit non viene archiviata a DB")
-    elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
-      logger.warn "Trovato: #{trovato[0].dig("properties","nome")}"
-      logger.warn "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}"
-      row[:possibile_match] = 'nessuno'
-      @no_archivate << row
-      Failure("Questa remit non viene archiviata a DB")
-    else
-      possibile_match       = trovato[0].dig("properties","nome")
-      row[:possibile_match] = possibile_match
-      logger.debug "Trovato a db:    " + possibile_match
-      if $INTERFACE == "scheduler"
-        @no_archivate << row
-        Failure("Questa remit non viene archiviata a DB")
-      else
-        id_transmission = trovato[0]["_id"]
-        if salva_nome_terna(id_transmission, nome)
-          Success(id_transmission)
-        else
-          @no_archivate << row
-          Failure("Utente non vuole salvare il nome della linea a DB")
-        end
-      end
-    end
   end
 
   #
@@ -404,11 +459,9 @@ class ArchiviaController < Transmission::BaseController
     logger.send(level, message)
   end
 
-  memoize :dt_upd
   memoize :db
-  memoize :remit_terna
   memoize :coll_transmission
   memoize :coll_remit
   memoize :all_line
-
+  #
 end

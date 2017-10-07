@@ -43,7 +43,6 @@ class Handler
         break unless process_is_ok(action)
         $logger.debug "task #{action} finito corretamente"
       end
-
   end
 
   def process_is_ok(action)

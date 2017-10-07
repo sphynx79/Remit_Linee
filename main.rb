@@ -115,28 +115,6 @@ module Transmission
     Object.send :include, Yell::Loggable
   end
 
-  def set_trace_point
-    # trace = TracePoint.new(:call) do |tp|
-    #   tp.disable
-    #   path = tp.path
-    #   if (path =~ /Remit/) && (path !~ /rblcl/i) && (path !~ /ruby/i)
-    #     parameters = eval("method(:#{tp.method_id}).parameters", tp.binding)
-    #     parameters.map! do |_, arg|
-    #       if tp.binding.local_variable_defined?(arg)
-    #         "#{arg} = #{tp.binding.local_variable_get(arg)}"
-    #       end
-    #     end.join(', ')
-    #     puts "#{'*' * 40}CALL#{'*' * 40}".blue
-    #     puts "File: #{tp.path.split('/')[-2..-1].join('/')}:#{tp.lineno}".green
-    #     puts "Class: #{tp.defined_class}".green
-    #     puts "Method: #{tp.method_id}".green
-    #     puts "Params: #{parameters * ','}".green
-    #   end
-    #   tp.enable
-    # end
-    # trace.enable
-  end
-
   def set_development
     ENV['GLI_DEBUG'] = 'true'
     require 'ap'

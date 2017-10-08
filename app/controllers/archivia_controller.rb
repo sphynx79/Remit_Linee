@@ -18,7 +18,8 @@ class ArchiviaController < Transmission::BaseController
       result = in_sequence do
         get(:remit)   { leggi_remit(file)                                          }
         and_then      { archivia_remit(remit)                                      }
-        and_then      { sposta_file(file)                                          }
+        and_then      { make_report                                                }
+        # and_then      { sposta_file(file)                                          }
         and_yield     { Success("Archiviata #{file.split("/").last} con successo") }
       end
 
@@ -54,8 +55,8 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def make_report
-    html = ''
-    local_vars = @no_archiviate.map do |row|
+    try! do
+    sanitize = @no_archiviate.map do |row|
       row.transform_values! do |v|
         if v.is_a? DateTime
           v.strftime("%d/%m/%Y %R")
@@ -66,9 +67,14 @@ class ArchiviaController < Transmission::BaseController
         end
       end
     end
-    files = ["head", "body", "foot"]
-    files.each {|fn| html +=  eval('%Q(' + File.read("./html/#{fn}.html") + ')') }
+    group   = sanitize.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
+    match   = group[:match]
+    nomatch = group[:nomatch]
+
+    html = ERB.new(File.read("./html/report.html.erb"),nil , '-').result(binding)
+
     Transmission::BaseMail.send(html)
+    end
   end
 
   def css

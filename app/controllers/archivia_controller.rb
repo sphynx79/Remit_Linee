@@ -16,22 +16,18 @@ class ArchiviaController < Transmission::BaseController
     result = @files.map do |file|
       @no_archiviate = []
       result = in_sequence do
-        get(:remit)   { leggi_remit(file)                                          }
-        and_then      { archivia_remit(remit)                                      }
-        and_then      { make_report                                                }
-        # and_then      { sposta_file(file)                                          }
-        and_yield     { Success("Archiviata #{file.split("/").last} con successo") }
+        get(:remit)                { leggi_remit(file)             }
+        and_then                   { archivia_remit(remit)         }
+        get(:match)                { get_match                     }
+        and_then                   { make_file_match(match)        }
+        get(:nomatch)              { get_no_match                  }
+        and_then                   { make_file_no_match(nomatch)   }
+        and_then                   { make_report                   }
+        and_then                   { sposta_file(file)             }
+        and_yield                  { Success("Archiviata #{file.split("/").last} con successo") }
       end
-
-      # p leggi_remit(file) >> method(:archivia_remit)
-      # result.success? ? archivia_remit(result.value) : print(result.value)
     end
-
     Success(result) >> method(:formatta) >> method(:stampa)
-
-    # sposta_file
-
-    # make_report
   end
 
   private
@@ -71,50 +67,70 @@ class ArchiviaController < Transmission::BaseController
     match   = group[:match]
     nomatch = group[:nomatch]
 
-    html = ERB.new(File.read("./html/report.html.erb"),nil , '-').result(binding)
+    html = ERB.new(File.read("./template/report.html.erb"),nil , '-').result(binding)
 
     Transmission::BaseMail.send(html)
     end
   end
 
-  def css
-    css = <<-EOF
-     <style type="text/css">
-      table {
-      border: 1px solid #1C6EA4;
-      background-color: #EEEEEE;
-      width: 100%;
-      text-align: left;
-      border-collapse: collapse;
-      }
-      table td, table th {
-      border: 1px solid #AAAAAA;
-      padding: 3px 2px;
-      }
-      table tbody td {
-      font-size: 13px;
-      }
-      table tr:nth-child(even) {
-      background: #D0E4F5;
-      }
-      table thead {
-      background: #1C6EA4;
-      background: -moz-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
-      background: -webkit-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
-      background: linear-gradient(to bottom, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
-      border-bottom: 2px solid #444444;
-      }
-      table thead th {
-      font-size: 15px;
-      font-weight: bold;
-      color: #FFFFFF;
-      border-left: 2px solid #D0E4F5;
-      }
-      table thead th:first-child {
-      border-left: none;
-      }
-     </style>
-    EOF
+  def get_match
+    if @no_archiviate.empty?
+      Success(nil)
+    else
+      group  = @no_archiviate.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
+      Success(group[:match])
+    end
+  end
+
+  def get_no_match
+    if @no_archiviate.empty?
+      Success(nil)
+    else
+      group  = @no_archiviate.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
+      Success(group[:nomatch])
+    end
+  end
+
+  def make_file_match(match)
+    workbook  = RubyXL::Parser.parse("./template/template.xlsx")
+    worksheet = workbook[0]
+    match.each_with_index do |row,row_index|
+       
+      row = row.dup
+      row.delete(:dt_upd)
+      row[:decison] = "yes"
+      row.to_a.each_with_index do |column,column_index|
+        cell = worksheet[5+row_index][column_index] 
+        if cell.nil?
+          worksheet.add_cell(5+row_index, column_index, column[1])
+        else
+          cell.change_contents(column[1])
+        end
+      end
+    end
+    workbook.write("match.xlsx")
+    Success(0)
+  end
+
+  def make_file_no_match(nomatch)
+    workbook  = RubyXL::Parser.parse("./template/template.xlsx")
+    worksheet = workbook[0]
+    nomatch.each_with_index do |row,row_index|
+       
+      row = row.dup
+      row.delete(:dt_upd)
+      row[:decison] = "no"
+      row.to_a.each_with_index do |column,column_index|
+        cell = worksheet[5+row_index][column_index] 
+        if cell.nil?
+          worksheet.add_cell(5+row_index, column_index, column[1])
+        else
+          cell.change_contents(column[1])
+        end
+      end
+    end
+    workbook.write("nomatch.xlsx")
+    Success(0)
   end
 
   def formatta(result)
@@ -143,6 +159,7 @@ class ArchiviaController < Transmission::BaseController
   def stampa(messaggi)
     Success(messaggi.each{|m| render(msg: m) if $INTERFACE != "scheduler"})
   end
+
 
   ######################################
   #  METODI PER LETTURA FILE REMIT     #

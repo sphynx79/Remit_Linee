@@ -22,6 +22,7 @@ require 'deterministic/maybe'
 require 'lib/transmission'
 require 'tty-prompt'
 require 'net/smtp'
+require 'rubyXL'
 
 include Deterministic::Prelude
 include Deterministic::Prelude::Option

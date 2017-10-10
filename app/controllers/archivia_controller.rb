@@ -2,6 +2,7 @@
 
 # STDOUT.sync = true
 
+
 class ArchiviaController < Transmission::BaseController
   extend Memoist
 
@@ -9,7 +10,6 @@ class ArchiviaController < Transmission::BaseController
     # @todo: per ora prendo l'ultimo ma devo fare che li scansiona
     # tutti e legge quelli non letti
     @files  = lista_file
-    
 
     exit! unless file_exist?
 
@@ -20,10 +20,10 @@ class ArchiviaController < Transmission::BaseController
         and_then                   { archivia_remit(remit)         }
         get(:match)                { get_match                     }
         and_then                   { make_file_match(match)        }
-        get(:nomatch)              { get_no_match                  }
-        and_then                   { make_file_no_match(nomatch)   }
-        and_then                   { make_report                   }
-        and_then                   { sposta_file(file)             }
+        # get(:nomatch)              { get_no_match                  }
+        # and_then                   { make_file_no_match(nomatch)   }
+        # and_then                   { make_report                   }
+        # and_then                   { sposta_file(file)             }
         and_yield                  { Success("Archiviata #{file.split("/").last} con successo") }
       end
     end
@@ -52,24 +52,24 @@ class ArchiviaController < Transmission::BaseController
 
   def make_report
     try! do
-    sanitize = @no_archiviate.map do |row|
-      row.transform_values! do |v|
-        if v.is_a? DateTime
-          v.strftime("%d/%m/%Y %R")
-        elsif v.is_a? String
-          v.gsub(/linea/i, "")
-        else
-          v
+      sanitize = @no_archiviate.map do |row|
+        row.transform_values! do |v|
+          if v.is_a? DateTime
+            v.strftime("%d/%m/%Y %R")
+          elsif v.is_a? String
+            v.gsub(/linea/i, "")
+          else
+            v
+          end
         end
       end
-    end
-    group   = sanitize.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
-    match   = group[:match]
-    nomatch = group[:nomatch]
+      group   = sanitize.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
+      match   = group[:match]
+      nomatch = group[:nomatch]
 
-    html = ERB.new(File.read("./template/report.html.erb"),nil , '-').result(binding)
+      html = ERB.new(File.read("./template/report.html.erb"),nil, '-').result(binding)
 
-    Transmission::BaseMail.send(html)
+      Transmission::BaseMail.send(html)
     end
   end
 
@@ -91,37 +91,47 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
+  #
+  # @todo: per velocizzare usare questa gemma fast_excel
+  #
   def make_file_match(match)
     workbook  = RubyXL::Parser.parse("./template/template.xlsx")
     worksheet = workbook[0]
     match.each_with_index do |row,row_index|
-       
-      row = row.dup
-      row.delete(:dt_upd)
-      row[:decison] = "yes"
-      row.to_a.each_with_index do |column,column_index|
-        cell = worksheet[5+row_index][column_index] 
-        if cell.nil?
-          worksheet.add_cell(5+row_index, column_index, column[1])
-        else
-          cell.change_contents(column[1])
-        end
+      excel_row = doc_to_excel_row(row)
+      # row.delete(:dt_upd)
+      excel_row.each_with_index do |column, column_index|
+        worksheet.add_cell(5+row_index, column_index, column)
       end
     end
     workbook.write("match.xlsx")
     Success(0)
   end
 
+  def doc_to_excel_row(row)
+    nome            = row[:nome]
+    type_of_line    = "LIN"
+    volt            = row[:volt]
+    start_dt        = row[:start_dt].strftime("%d/%m/%Y")
+    start_hour      = row[:start_dt].strftime("%H:%M:%S")
+    stop_dt         = row[:end_dt].strftime("%d/%m/%Y")
+    stop_hour       = row[:end_dt].strftime("%H:%M:%S")
+    daily_rest      = ""
+    reason          = row[:reason]
+    possibile_match = row[:possibile_match]
+    decison         = "SI" 
+    return [nome, type_of_line, volt, start_dt, start_hour, stop_dt, stop_hour, daily_rest, reason, possibile_match, decison]
+  end
+
   def make_file_no_match(nomatch)
     workbook  = RubyXL::Parser.parse("./template/template.xlsx")
     worksheet = workbook[0]
     nomatch.each_with_index do |row,row_index|
-       
       row = row.dup
       row.delete(:dt_upd)
       row[:decison] = "no"
       row.to_a.each_with_index do |column,column_index|
-        cell = worksheet[5+row_index][column_index] 
+        cell = worksheet[5+row_index][column_index]
         if cell.nil?
           worksheet.add_cell(5+row_index, column_index, column[1])
         else
@@ -159,7 +169,6 @@ class ArchiviaController < Transmission::BaseController
   def stampa(messaggi)
     Success(messaggi.each{|m| render(msg: m) if $INTERFACE != "scheduler"})
   end
-
 
   ######################################
   #  METODI PER LETTURA FILE REMIT     #
@@ -227,7 +236,7 @@ class ArchiviaController < Transmission::BaseController
       ᐅ(~:first).
       ᐅ(~:rows).
       ᐅ(~:drop, 5).
-      ᐅ(~:keep_if, &filter)     end
+      ᐅ(~:keep_if, &filter)             end
   end
 
   #

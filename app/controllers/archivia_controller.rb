@@ -15,15 +15,25 @@ class ArchiviaController < Transmission::BaseController
     result = @files.map do |file|
       @no_archiviate = []
       result = in_sequence do
-        get(:remit)                { leggi_remit(file)             }
-        and_then                   { archivia_remit(remit)         }
-        get(:match)                { get_match                     }
-        and_then                   { make_file(match, "match")     }
-        get(:nomatch)              { get_no_match                  }
-        and_then                   { make_file(nomatch, "nomatch") }
-        # and_then                   { make_report                   }
-        # and_then                   { sposta_file(file)             }
-        and_yield                  { Success("Archiviata #{file.split("/").last} con successo") }
+        get(:remit)              { leggi_remit(file)                      }
+        and_then                 { archivia_remit(remit)                  }
+
+        # controlla e gestisce le remit che non sono state 
+        # archviate ma non hanno un match
+        get(:match)              { get_match_no_archiviate                }
+        get(:file_match)         { make_file(match, "match")              }
+        get(:match_path)         { make_path(file, "match")               }
+        and_then                 { write_xlsx(file_match, match_path)     }
+
+        # controlla e gestisce le remit che non sono state 
+        # archviate e non hanno nessin match
+        get(:nomatch)            { get_nomatch_no_archiviate              }
+        get(:file_nomatch)       { make_file(nomatch, "nomatch")          }
+        get(:nomatch_path)       { make_path(file, "nomatch")             }
+        and_then                 { write_xlsx(file_nomatch, nomatch_path) }
+        # and_then               { make_report                            }
+        and_then                 { sposta_file(file)                      }
+        and_yield                { Success("Archiviata #{file.split("/").last} con successo") }
       end
     end
     Success(result) >> method(:formatta) >> method(:stampa)
@@ -42,7 +52,7 @@ class ArchiviaController < Transmission::BaseController
   #
   def sposta_file(file)
     try! do
-      folder    = @no_archiviate.empty? ? Transmission::Config.path.archivio : Transmission::Config.path.partial
+      folder    = Transmission::Config.path.archivio
       file_name = file.split("/").last
       dest      = folder + file_name
       FileUtils.mv file, dest
@@ -72,7 +82,7 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def get_match
+  def get_match_no_archiviate
     if @no_archiviate.empty?
       Success(nil)
     else
@@ -81,7 +91,7 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def get_no_match
+  def get_nomatch_no_archiviate
     if @no_archiviate.empty?
       Success(nil)
     else
@@ -94,6 +104,7 @@ class ArchiviaController < Transmission::BaseController
   # @todo: per velocizzare usare questa gemma fast_excel
   #
   def make_file(data, type)
+    return Success(nil) if data.nil?
     try! do
       workbook  = RubyXL::Parser.parse("./template/template.xlsx")
       worksheet = workbook[0]
@@ -104,7 +115,26 @@ class ArchiviaController < Transmission::BaseController
           worksheet.add_cell(5+row_index, column_index, column)
         end
       end
-      workbook.write("#{type}.xlsx")
+      Success(workbook)
+    end
+  end
+
+  def make_path(file, type)
+    return Success(nil) if file.nil?
+    try! do
+      folder = type == "match" ? Transmission::Config.path.match : Transmission::Config.path.nomatch
+      file.
+        ᐅ(~:split, "/").
+        ᐅ(~:last).
+        ᐅ(~:sub, ".xlsx", "_#{type}.xlsx").
+        ᐅ(~:prepend, folder)
+    end
+  end
+
+  def write_xlsx(file, path)
+    return Success(nil) if file.nil?
+    try! do
+      file.write(path)
     end
   end
 
@@ -132,7 +162,11 @@ class ArchiviaController < Transmission::BaseController
         unless r.value.class.ancestors.include? Exception
           msg << r.value.red
         else
-          msg << r.value.message.red
+          message = "#{r.value.message}\n".red
+          
+          bkt = ""
+          r.value.backtrace.select { |v| v =~ /archivia_controller.rb/ }.each do |x| bkt += "#{x}\n".red end
+          msg << message + bkt
           # @todo: migliore l'output delle eccezioni con pretty_backtrace
           # bkt = ""
           # binding.pry
@@ -215,7 +249,7 @@ class ArchiviaController < Transmission::BaseController
       ᐅ(~:first).
       ᐅ(~:rows).
       ᐅ(~:drop, 5).
-      ᐅ(~:keep_if, &filter)                     end
+      ᐅ(~:keep_if, &filter)                         end
   end
 
   #

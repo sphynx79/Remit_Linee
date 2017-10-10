@@ -2,7 +2,6 @@
 
 # STDOUT.sync = true
 
-
 class ArchiviaController < Transmission::BaseController
   extend Memoist
 
@@ -19,9 +18,9 @@ class ArchiviaController < Transmission::BaseController
         get(:remit)                { leggi_remit(file)             }
         and_then                   { archivia_remit(remit)         }
         get(:match)                { get_match                     }
-        and_then                   { make_file_match(match)        }
-        # get(:nomatch)              { get_no_match                  }
-        # and_then                   { make_file_no_match(nomatch)   }
+        and_then                   { make_file(match, "match")     }
+        get(:nomatch)              { get_no_match                  }
+        and_then                   { make_file(nomatch, "nomatch") }
         # and_then                   { make_report                   }
         # and_then                   { sposta_file(file)             }
         and_yield                  { Success("Archiviata #{file.split("/").last} con successo") }
@@ -94,18 +93,19 @@ class ArchiviaController < Transmission::BaseController
   #
   # @todo: per velocizzare usare questa gemma fast_excel
   #
-  def make_file_match(match)
-    workbook  = RubyXL::Parser.parse("./template/template.xlsx")
-    worksheet = workbook[0]
-    match.each_with_index do |row,row_index|
-      excel_row = doc_to_excel_row(row)
-      # row.delete(:dt_upd)
-      excel_row.each_with_index do |column, column_index|
-        worksheet.add_cell(5+row_index, column_index, column)
+  def make_file(data, type)
+    try! do
+      workbook  = RubyXL::Parser.parse("./template/template.xlsx")
+      worksheet = workbook[0]
+      data.each_with_index do |row, row_index|
+        excel_row = doc_to_excel_row(row)
+        excel_row << (type == "match" ? "SI" : "NO")
+        excel_row.each_with_index do |column, column_index|
+          worksheet.add_cell(5+row_index, column_index, column)
+        end
       end
+      workbook.write("#{type}.xlsx")
     end
-    workbook.write("match.xlsx")
-    Success(0)
   end
 
   def doc_to_excel_row(row)
@@ -119,28 +119,7 @@ class ArchiviaController < Transmission::BaseController
     daily_rest      = ""
     reason          = row[:reason]
     possibile_match = row[:possibile_match]
-    decison         = "SI" 
-    return [nome, type_of_line, volt, start_dt, start_hour, stop_dt, stop_hour, daily_rest, reason, possibile_match, decison]
-  end
-
-  def make_file_no_match(nomatch)
-    workbook  = RubyXL::Parser.parse("./template/template.xlsx")
-    worksheet = workbook[0]
-    nomatch.each_with_index do |row,row_index|
-      row = row.dup
-      row.delete(:dt_upd)
-      row[:decison] = "no"
-      row.to_a.each_with_index do |column,column_index|
-        cell = worksheet[5+row_index][column_index]
-        if cell.nil?
-          worksheet.add_cell(5+row_index, column_index, column[1])
-        else
-          cell.change_contents(column[1])
-        end
-      end
-    end
-    workbook.write("nomatch.xlsx")
-    Success(0)
+    return [nome, type_of_line, volt, start_dt, start_hour, stop_dt, stop_hour, daily_rest, reason, possibile_match]
   end
 
   def formatta(result)
@@ -236,7 +215,7 @@ class ArchiviaController < Transmission::BaseController
       ᐅ(~:first).
       ᐅ(~:rows).
       ᐅ(~:drop, 5).
-      ᐅ(~:keep_if, &filter)             end
+      ᐅ(~:keep_if, &filter)                     end
   end
 
   #

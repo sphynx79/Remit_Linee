@@ -1,7 +1,7 @@
 class Start
 
   def self.call(msg=nil)
-    puts msg
+    logger.info msg
   end
 
 end

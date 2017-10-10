@@ -95,7 +95,6 @@ class DownloadController < Transmission::BaseController
     result.each do |r|
       if r.success?
         msg << r.value.green
-        # render(msg: msg) if $INTERFACE != "scheduler"
       else
         if r.value.class.ancestors.include? Exception
           bkt = r.value.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0]
@@ -111,7 +110,7 @@ class DownloadController < Transmission::BaseController
   end
 
   def stampa(messaggi)
-    Success(messaggi.each{|m| render(msg: m) if $INTERFACE != "scheduler"})
+    Success(messaggi.each{|m| render(msg: m)})
   end
 
   def page

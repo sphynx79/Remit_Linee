@@ -23,6 +23,10 @@ require 'lib/transmission'
 require 'tty-prompt'
 require 'net/smtp'
 require 'rubyXL'
+# require 'pretty_backtrace'
+#
+# PrettyBacktrace.enable
+# PrettyBacktrace.multi_line = true
 
 include Deterministic::Prelude
 include Deterministic::Prelude::Option
@@ -98,8 +102,8 @@ module Transmission
     end
   end
 
-  def init_log(level)
-    level = level ? "debug" : "error"
+  def init_log(verbose)
+    level = verbose ? "debug" : "error"
     Yell.new(name: Object, format: false) do |l|
       l.adapter STDOUT, colors: true, level: "gte.#{level} lte.error"
       l.adapter STDERR, colors: true, level: 'gte.fatal'
@@ -117,7 +121,8 @@ module Transmission
   end
 
   def set_development
-    ENV['GLI_DEBUG'] = 'true'
+    # @todo: vedere se lasciare ENV['GLI_DEBUG'] = true
+    ENV['GLI_DEBUG'] = 'false'
     require 'ap'
     require 'pry'
   end

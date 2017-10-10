@@ -2,18 +2,22 @@ class DownloadController < Transmission::BaseController
   extend Memoist
 
   def start
+    
     result = remote_files.map do |row|
       download_file(row)
     end
-
     Success(result) >> method(:formatta) >> method(:stampa)
-
   end
 
   private
 
   def remote_files
-    page.css('#dnn_ctr5896_TernaViewDocumentView_grdDocument_ctl00 > tbody > tr')
+    begin
+      page.css('#dnn_ctr5896_TernaViewDocumentView_grdDocument_ctl00 > tbody > tr')
+    rescue => e
+      Success([Failure(e)]) >> method(:formatta) >> method(:stampa)
+      exit!
+    end
   end
 
   def download_file(row)
@@ -88,20 +92,17 @@ class DownloadController < Transmission::BaseController
 
   def formatta(result)
     msg = []
-    format_result = result.collect do |r|
+    result.each do |r|
       if r.success?
         msg << r.value.green
         # render(msg: msg) if $INTERFACE != "scheduler"
       else
-        unless r.value.class.ancestors.include? Exception
-          msg << r.value.red
+        if r.value.class.ancestors.include? Exception
+          bkt = r.value.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0]
+          msg << (r.value.original_message + "\n" + bkt).red
+          
         else
-          msg << r.value.message.red
-          # @todo: migliore l'output delle eccezioni con pretty_backtrace
-          # bkt = ""
-          # binding.pry
-          # r.value.backtrace.select { |v| v =~ /download_controller.rb/ }.each do |x| bkt << x.red end
-          # msg[r.value.message] = bkt
+          msg << r.value.red
         end
       end
       msg

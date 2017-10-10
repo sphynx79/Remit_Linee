@@ -6,11 +6,9 @@ class ArchiviaController < Transmission::BaseController
   extend Memoist
 
   def start
-    # @todo: per ora prendo l'ultimo ma devo fare che li scansiona
-    # tutti e legge quelli non letti
     @files  = lista_file
 
-    exit! unless file_exist?
+    exit! unless there_is_file?
 
     result = @files.map do |file|
       @no_archiviate = []
@@ -154,24 +152,17 @@ class ArchiviaController < Transmission::BaseController
 
   def formatta(result)
     msg = []
-    format_result = result.collect do |r|
+    result.each do |r|
       if r.success?
         msg << r.value.green
         # render(msg: msg) if $INTERFACE != "scheduler"
       else
-        unless r.value.class.ancestors.include? Exception
-          msg << r.value.red
-        else
-          message = "#{r.value.message}\n".red
+        if r.value.class.ancestors.include? Exception
+          bkt = r.value.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0]
+          msg << (r.value.original_message + "\n" + bkt).red
           
-          bkt = ""
-          r.value.backtrace.select { |v| v =~ /archivia_controller.rb/ }.each do |x| bkt += "#{x}\n".red end
-          msg << message + bkt
-          # @todo: migliore l'output delle eccezioni con pretty_backtrace
-          # bkt = ""
-          # binding.pry
-          # r.value.backtrace.select { |v| v =~ /download_controller.rb/ }.each do |x| bkt << x.red end
-          # msg[r.value.message] = bkt
+        else
+          msg << r.value.red
         end
       end
       msg
@@ -197,7 +188,7 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def file_exist?
+  def there_is_file?
     if @files.empty?
       print "non trovo nessun file remit\n"
       return false
@@ -244,12 +235,14 @@ class ArchiviaController < Transmission::BaseController
   #
   def get_sheet(file)
     filter = ->(row) {row[1] == "LIN" &&  row[2] == "400 kV"}
-    try! do file.
-      ᐅ(~:sheets).
-      ᐅ(~:first).
-      ᐅ(~:rows).
-      ᐅ(~:drop, 5).
-      ᐅ(~:keep_if, &filter)                         end
+    try! do 
+      file.
+        ᐅ(~:sheets).
+        ᐅ(~:first).
+        ᐅ(~:rows).
+        ᐅ(~:drop, 5).
+        ᐅ(~:keep_if, &filter)                         
+    end
   end
 
   #
@@ -328,7 +321,7 @@ class ArchiviaController < Transmission::BaseController
       ᐅ(~:find, {"properties.nome_terna" => nome_terna}).
       ᐅ(~:limit, 1).
       ᐅ(~:to_a)
-
+  
     if doc.empty?
       logger.debug "Per #{nome_terna} non ho trovato nessun id"
       Success(nil)

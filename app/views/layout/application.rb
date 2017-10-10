@@ -10,11 +10,11 @@ class Layout
   end
 
   def header
-    puts "*"*48
+    logger.info "\n"+"*"*57
   end
 
   def footer
-    puts "*"*48
+    logger.info "*"*57
   end
 
   end

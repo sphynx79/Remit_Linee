@@ -49,7 +49,7 @@ class Handler
     exit_status, err, out = start_process(action)
 
     if (out != nil) &&  (out != "")
-      $logger.info "Out: #{out.strip}"
+      $logger.info " #{out.strip}"
     end
 
     if exit_status != 0
@@ -58,7 +58,7 @@ class Handler
         p "Invio email"
         # Email.send(err, action, controparte)
       else
-        $logger.info "Il file è già presente"
+        $logger.info " nessun file da archiviare"
       end
       return false
     end
@@ -82,7 +82,7 @@ end
 
 task = Handler.new(actions: ["download", "archivia"])
 
-scheduler.every('50s', task, :timeout => '5m', :tag  => 'task')
+scheduler.every('5s', task, :timeout => '5m', :tag  => 'task')
 
 puts "Start Scheduler"
 

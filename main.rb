@@ -103,10 +103,16 @@ module Transmission
   end
 
   def init_log(verbose)
-    level = verbose ? "debug" : "error"
-    Yell.new(name: Object, format: false) do |l|
-      l.adapter STDOUT, colors: true, level: "gte.#{level} lte.error"
-      l.adapter STDERR, colors: true, level: 'gte.fatal'
+    level = verbose ? "debug" : "info"
+    if $INTERFACE == "scheduler"
+      Yell.new(name: Object, format: false) do |l|
+        l.adapter STDERR, colors: true, level: 'gte.fatal'
+      end
+    else
+      Yell.new(name: Object, format: false) do |l|
+        l.adapter STDOUT, level: "gte.#{level} lte.error"
+        l.adapter STDERR, level: 'gte.fatal'
+      end
     end
     # Yell.new(name: 'scheduler', format: Yell.format('%d: %m', '%d-%m-%Y %H:%M')) do |l|
     #   l.adapter STDOUT, colors: false, level: 'at.warn'

@@ -12,8 +12,6 @@ class ArchiviaController < Transmission::BaseController
 
     (exit! 2) unless there_is_file?
 
-
-
     result = @files.map do |file|
       @no_archiviate = []
       in_sequence do
@@ -355,7 +353,7 @@ class ArchiviaController < Transmission::BaseController
       logger.info "Non trovo nessuna linea"
       row[:possibile_match] = 'nessuno'
       @no_archiviate << row
-      Failure("Questa remit non viene archiviata a DB")
+      Failure("Questa remit non viene archiviata a DB".red)
     elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
       logger.info "Trovato: #{trovato[0].dig("properties","nome")}"
       logger.info "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}".red
@@ -387,7 +385,7 @@ class ArchiviaController < Transmission::BaseController
   # @todo: migliorare perfomnce per inserire piu doc in un momento
   #
   def archivia(doc)
-    # result = coll_remit.insert_one(doc)
+     result = coll_remit.insert_one(doc)
     # fare il check se riuscito a salvare la linea usando result
     # result.n
     logger.debug "Archivio la linea a db"

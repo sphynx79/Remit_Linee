@@ -108,6 +108,7 @@ class ArchiviaController < Transmission::BaseController
     try! do
       workbook  = RubyXL::Parser.parse("./template/template.xlsx")
       worksheet = workbook[0]
+
       data.each_with_index do |row, row_index|
         excel_row = doc_to_excel_row(row)
         excel_row << (type == "match" ? "SI" : "NO")
@@ -142,6 +143,7 @@ class ArchiviaController < Transmission::BaseController
     nome            = row[:nome]
     type_of_line    = "LIN"
     volt            = row[:volt]
+    # start_dt        = row[:start_dt].to_date
     start_dt        = row[:start_dt].strftime("%d/%m/%Y")
     start_hour      = row[:start_dt].strftime("%H:%M:%S")
     stop_dt         = row[:end_dt].strftime("%d/%m/%Y")
@@ -161,7 +163,7 @@ class ArchiviaController < Transmission::BaseController
       else
         if r.value.class.ancestors.include? Exception
           bkt = r.value.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0]
-          msg << (r.value.original_message + "\n" + bkt).red
+          msg << (r.value.message + "\n" + bkt).red
         else
           msg << r.value.red
         end
@@ -190,6 +192,9 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
+  #
+  # Controllo se ho almeno un file da leggere
+  #
   def there_is_file?
     if @files.empty?
       print "non trovo nessun file remit\n"
@@ -215,14 +220,15 @@ class ArchiviaController < Transmission::BaseController
       sheet.map do |row|
         nome       = row[0]
         volt       = row[2]
-        start_date = row[3]
-        start_time = row[4]
-        end_date   = row[5]
-        end_time   = row[6]
+        start_date = (row[3].is_a? String) ? Date.parse(row[3]) : row[3]
+        start_time = (row[4].is_a? String) ? Time.parse(row[4]) : row[4]
+        end_date   = (row[5].is_a? String) ? Date.parse(row[5]) : row[5]
+        end_time   = (row[6].is_a? String) ? Time.parse(row[6]) : row[6]
         reason     = row[8]
+        decision   = row[10]
         start_dt   = to_datetime(start_date, start_time)
         end_dt     = to_datetime(end_date, end_time)
-        {nome: nome, volt: volt, dt_upd: dt_upd, start_dt: start_dt, end_dt: end_dt, reason: reason}
+        {nome: nome, volt: volt, dt_upd: dt_upd, start_dt: start_dt, end_dt: end_dt, reason: reason, decision: decision}
       end
     end
   end
@@ -277,12 +283,12 @@ class ArchiviaController < Transmission::BaseController
   #
   def get_dt_upd(file)
     try! do
-      to_datetime =  ->(string) { DateTime.strptime(string,"%Y_%m_%d") }
+      # to_datetime =  ->(string) { DateTime.strptime(string,"%Y_%m_%d") }
       file.
         ᐅ(~:split, '/').
         ᐅ(~:last).
-        ᐅ(~:gsub, /remit_|.xlsx/i, "").
-        ᐅ(to_datetime)
+        ᐅ(~:gsub, /remit_|.xlsx|_adjust/i, "").
+        ᐅ(DateTime.method(:strptime), "%Y_%m_%d")
     end
   end
 
@@ -290,6 +296,13 @@ class ArchiviaController < Transmission::BaseController
   #    METODI PER ARCHVIAZIONE A DB    #
   ######################################
 
+  #
+  # Avvia il processo di archiviazione a db utilizzando in_sequence
+  # se una sola delle azzioni non va a buon fine tutte le azzioni
+  # successive non vengono eseguite
+  # Nel caso in cui avessi un Failure prima della fine della sequenza
+  # mi viene segnalato con un logger.warn
+  #
   def archivia_remit(remit_terna)
     try! do
       remit_terna.each do |row|
@@ -315,7 +328,7 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
-  # Cerca nell collezione transmission il nome della linea
+  # Cerca nella collezione transmission il nome della linea
   # se lo trova mi restituisce l'id altrimenti nil
   #
   def transmission_id(nome_terna)
@@ -341,54 +354,84 @@ class ArchiviaController < Transmission::BaseController
   #
   def possibili_id(row)
     logger.info "Cerco nel db i possibili id che possono corrispondere al nome"
-    nome = row[:nome]
-    row  = row.dup
+    nome                 = row[:nome]
+    row                  = row.dup
     id_terna, nome_clean = clean_name(nome)
+
     # logger.debug "id_terna:     #{id_terna}"
     logger.info "nome linea:      #{nome}".rjust(5)
 
-    f = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
-    trovato = f.find_with_score(nome_clean)
+    trovato = fuzzy_search_possible_line(id_terna, nome_clean)
+
     if trovato.nil?
       logger.info "Non trovo nessuna linea"
       row[:possibile_match] = 'nessuno'
       @no_archiviate << row
-      Failure("Questa remit non viene archiviata a DB".red)
-    elsif (trovato[1] < 0.16) && (trovato[2] < 0.16)
-      logger.info "Trovato: #{trovato[0].dig("properties","nome")}"
-      logger.info "Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}".red
+      return Failure("Questa remit non viene archiviata a DB".red)
+    end
+
+    if (trovato[1] < 0.16) && (trovato[2] < 0.16)
+      logger.info("Trovato: #{trovato[0].dig("properties","nome")}")
+      logger.info("Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}".red)
       row[:possibile_match] = 'nessuno'
       @no_archiviate << row
-      Failure("Questa remit non viene archiviata a DB".red)
-    else
-      possibile_match       = trovato[0].dig("properties","nome")
-      row[:possibile_match] = possibile_match
-      logger.info "Trovato a db:    " + possibile_match
-      if $INTERFACE == "scheduler"
-        @no_archiviate << row
-        Failure("Questa remit non viene archiviata a DB".red)
-      else
-        id_transmission = trovato[0]["_id"]
-        if salva_nome_terna(id_transmission, nome)
-          Success(id_transmission)
-        else
-          @no_archiviate << row
-          Failure("Utente non vuole salvare il nome della linea a DB")
-        end
-      end
+      return Failure("Questa remit non viene archiviata a DB".red)
     end
+
+    possibile_match       = trovato[0].dig("properties","nome")
+    row[:possibile_match] = possibile_match
+    logger.info("Trovato a db:    " + possibile_match)
+    id_transmission = trovato[0]["_id"]
+
+    if row[:decision] == "SI"
+      logger.info("Sto leggendo un file adjust")
+      logger.info("In decision ho SI")
+      salva_nome_terna(id_transmission, nome)
+      return Success(id_transmission)
+    end
+
+    if row[:decision] == "NO"
+      logger.info("Sto leggendo un file adjust")
+      logger.info("In decision ho NO")
+      return Failure("Questa remit non viene archiviata a DB".red)
+    end
+
+    if $INTERFACE == "scheduler"
+      @no_archiviate << row
+      return Failure("Questa remit non viene archiviata a DB".red)
+    end
+
+    if salvo_nome_in_db? 
+      salva_nome_terna(id_transmission, nome)
+      Success(id_transmission)
+    else
+      @no_archiviate << row
+      Failure("Utente non vuole salvare il nome della linea a DB")
+    end
+
+  end
+
+  #
+  # Utilizza la gemma fuzzymatch per cercare tra tutte le linee che ho in anagrafica
+  # il nome che piu assomiglia al nome della linea che sto leggendo
+  #
+  def fuzzy_search_possible_line(id_terna, nome)
+    # @todo: ho utilizzato per all_line la memoize vedere se puo dare problemi
+    # in caso inserisco una linea e ho la stassa linea nello stesso file
+    fuzzy_match = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+    fuzzy_match.find_with_score(nome)
   end
 
   #
   # Inserisce in documento nel db remit
   #
-  # @todo: migliorare perfomnce per inserire piu doc in un momento
+  # @todo: migliorare performance per inserire piu doc in un momento
   #
   def archivia(doc)
-     result = coll_remit.insert_one(doc)
+    result = coll_remit.insert_one(doc)
     # fare il check se riuscito a salvare la linea usando result
     # result.n
-    logger.debug "Archivio la linea a db"
+    logger.info("Archiviato la linea a db".green)
     Success(0)
   end
 
@@ -408,7 +451,13 @@ class ArchiviaController < Transmission::BaseController
   # per le performance
   #
   def make_doc(row, id, unique_id)
-    try! {row.dup.merge({id_transmission: id, unique_id: unique_id})}
+    try! do 
+      rm_decison = ->(hash) { hash.delete_if { |k,v| k == :decision } }
+      row.
+        ᐅ(~:dup).
+        ᐅ(~:merge, {id_transmission: id, unique_id: unique_id}).
+        ᐅ(rm_decison)
+    end
   end
 
   #
@@ -425,20 +474,28 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
+  # Mi chiede se voglio salvare la linea a db
+  #
+  def salvo_nome_in_db?
+    prompt = TTY::Prompt.new
+    prompt.yes?('Vuoi salvare il nome della linea?'.green)
+  end
+
+  #
   # Chiede all'utente se vuole salvare il nome di terna nel db transmission
   #
   def salva_nome_terna(id_transmission, nome)
-    prompt = TTY::Prompt.new
-    response = prompt.ask('Vuoi salvare il nome della linea?'.green, default: 'Si')
-    return false if response != "Si"
     logger.debug "Salvo il nome_terna a db"
-    doc  = coll_transmission.find({_id: id_transmission}).limit(1)
-    array_nome_terna_size = doc.first.dig("properties","nome_terna").size
+
+    doc_id_transmission   = coll_transmission.find({_id: id_transmission}).limit(1)
+    array_nome_terna_size = doc_id_transmission.first.dig("properties","nome_terna").size
+
     logger.info "Attenzione questa linee ha gia #{array_nome_terna_size} nomi" if array_nome_terna_size > 0
 
-    result = doc.update_one({'$addToSet' => {"properties.nome_terna": nome}})
+    result = doc_id_transmission.update_one({'$addToSet' => {"properties.nome_terna": nome}})
+
     if result.modified_count == 1
-      logger.debug "nome_terna #{nome} salvato nel db"
+      logger.info "nome_terna #{nome} salvato nel db"
     end
   end
 

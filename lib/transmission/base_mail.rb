@@ -32,8 +32,10 @@
 module Transmission
 
   class BaseMail
-    def self.send(message)
-      # p "Prepara invio email"
+    def self.send(message, match_path)
+
+      p "Prepara invio email"
+
       from    = 'michele.boscolo@eni.com'
       to      = 'michele.boscolo@eni.com'
       subject = 'Linee remit non associate'
@@ -51,34 +53,38 @@ module Transmission
       EOF
 
 
-      match   = "match.xlsx"
-      file_match  = File.open(match, 'rb')
-      file_content_match = file_match.read()
-      encoded_content_match = [file_content_match].pack("m*")   # base64
-      match_attach =<<~EOF
-      Content-Type: application/vnd.ms-excel; name=\"#{match}\"
-      Content-Transfer-Encoding: base64
-      Content-Disposition: attachment; filename="#{match}"
-      Content-Description: "#{match}"
+      if match_path != nil
+        file_name          = match_path.split("/").last
+        file_match         = File.open(match_path, 'rb')
+        file_content_match = file_match.read()
+        encoded_content_match = [file_content_match].pack("m*")   # base64
+        match_attach =<<~EOF
+        Content-Type: application/vnd.ms-excel; name=\"#{file_name}\"
+        Content-Transfer-Encoding: base64
+        Content-Disposition: attachment; filename="#{file_name}"
+        Content-Description: "#{file_name}"
 
-      #{encoded_content_match}
-      --#{marker}
-      EOF
+        #{encoded_content_match}
+        --#{marker}
+        EOF
+      end
 
-      nomatch = "nomatch.xlsx"
-      file_nomatch  = File.open(nomatch, 'rb')
-      file_content_nomatch = file_nomatch.read()
-      encoded_content_nomatch = [file_content_nomatch].pack("m*")   # base64
-      # Define the attachment section
-      nomatch_attach =<<~EOF
-      Content-Type: application/vnd.ms-excel; name=\"#{nomatch}\"
-      Content-Transfer-Encoding: base64
-      Content-Disposition: attachment; filename="#{nomatch}"
-      Content-Description: "#{nomatch}"
-
-      #{encoded_content_nomatch}
-      --#{marker}
-      EOF
+      # if file_nomatch != nil
+      #   nomatch = file_nomatch.split("/").last
+      #   file_nomatch  = File.open(file_nomatch, 'rb')
+      #   file_content_nomatch = file_nomatch.read()
+      #   encoded_content_nomatch = [file_content_nomatch].pack("m*")   # base64
+      #   # Define the attachment section
+      #   nomatch_attach =<<~EOF
+      #   Content-Type: application/vnd.ms-excel; name=\"#{nomatch}\"
+      #   Content-Transfer-Encoding: base64
+      #   Content-Disposition: attachment; filename="#{nomatch}"
+      #   Content-Description: "#{nomatch}"
+      #
+      #   #{encoded_content_nomatch}
+      #   --#{marker}
+      #   EOF
+      # end
 
 
 
@@ -90,15 +96,17 @@ module Transmission
       --#{marker}--
       HTML
 
-
-      msg = head + match_attach + nomatch_attach + body
-
+      # match_attach   = file_match.nil? ? "" : match_attach
+      # nomatch_attach = file_nomatch.nil? ? "" : nomatch_attach
+      # msg = head + match_attach + nomatch_attach + body
+      
+      msg = head + match_attach + body
 
       begin
         Net::SMTP.start('relay.eni.pri', 25) do |smtp|
           smtp.send_message msg, from, to
         end
-        # p "Email Inviata"
+        p "Email Inviata"
       rescue Exception => e
         print  e
       end

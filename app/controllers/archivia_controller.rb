@@ -8,7 +8,7 @@ class ArchiviaController < Transmission::BaseController
   def start
     @files  = lista_file
 
-    # $stdout = File.open(File::NULL, "w")   
+    # $stdout = File.open(File::NULL, "w")
 
     (exit! 2) unless there_is_file?
 
@@ -18,21 +18,27 @@ class ArchiviaController < Transmission::BaseController
         get(:remit)              { leggi_remit(file)                      }
         and_then                 { archivia_remit(remit)                  }
 
-        # controlla e gestisce le remit che non sono state 
+        # controlla e gestisce le remit che non sono state
         # archviate ma non hanno un match
         get(:match)              { get_match_no_archiviate                }
-        get(:file_match)         { make_file(match, "match")              }
-        get(:match_path)         { make_path(file, "match")               }
-        and_then                 { write_xlsx(file_match, match_path)     }
+        get(:match_path)         { make_file_xlsx(file, match: match)            }
 
-        # controlla e gestisce le remit che non sono state 
+        # get(:workbook_match)     { make_file(match, "match")              }
+        # get(:match_path)         { make_path(file, "match")               }
+        # and_then                 { write_xlsx(workbook_match, match_path) }
+
+        # controlla e gestisce le remit che non sono state
         # archviate e non hanno nessin match
-        get(:nomatch)            { get_nomatch_no_archiviate              }
-        get(:file_nomatch)       { make_file(nomatch, "nomatch")          }
-        get(:nomatch_path)       { make_path(file, "nomatch")             }
-        and_then                 { write_xlsx(file_nomatch, nomatch_path) }
-        # and_then               { make_report                            }
+        # get(:nomatch)            { get_nomatch_no_archiviate              }
+        # get(:workbook_nomatch)   { make_file(nomatch, "nomatch")          }
+        # get(:nomatch_path)       { make_path(file, "nomatch")             }
+        # and_then                 { write_xlsx(workbook_nomatch, nomatch_path) }
+
+        # Invio Email
+        and_then                 { make_report(match_path, match)  }
+        # Sposta il file originale
         and_then                 { sposta_file(file)                      }
+
         and_yield                { Success("Archiviata #{file.split("/").last} con successo") }
       end
     end
@@ -44,6 +50,35 @@ class ArchiviaController < Transmission::BaseController
   ######################################
   #      METODI UTILIZZO VARIO         #
   ######################################
+
+
+  def make_file_xlsx(file, **data)
+    binding.pry
+    return Success(nil) if data.values[0].nil?
+    type = data.keys[0].to_s
+    data = data.values[0]
+    in_sequence do
+      get(:workbook_match)     { make_file(data, type)               }
+      get(:path)               { make_path(file, type)               }
+      and_then                 { write_xlsx(workbook_match, path)    }
+      and_yield                { Success(path)                       }
+    end
+  end
+
+  def make_report(match_path, match)
+    if match_path.nil?
+      return Success(nil)
+    end
+
+    try! do
+      match = sanitize(match)
+      html  = ERB.new(File.read("./template/report.html.erb"),nil, '-').result(binding)
+      
+      binding.pry
+
+      Transmission::BaseMail.send(html, match_path)
+    end
+  end
 
   #
   # Sposta il file della remit
@@ -59,26 +94,20 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def make_report
-    try! do
-      sanitize = @no_archiviate.map do |row|
-        row.transform_values! do |v|
-          if v.is_a? DateTime
-            v.strftime("%d/%m/%Y %R")
-          elsif v.is_a? String
-            v.gsub(/linea/i, "")
-          else
-            v
-          end
+  def sanitize(data)
+    to = ->(v) {
+        case v
+          when DateTime then v.strftime("%d/%m/%Y %R")
+          when String   then v.gsub(/linea/i, "")
+          else v 
         end
-      end
-      group   = sanitize.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
-      match   = group[:match]
-      nomatch = group[:nomatch]
+      }
+    key = ->(k,_) { k == :decision }
 
-      html = ERB.new(File.read("./template/report.html.erb"),nil, '-').result(binding)
-
-      Transmission::BaseMail.send(html)
+    sanitize_match = data.map do |row|
+      row.
+        ᐅ(~:transform_values!, &to).
+        ᐅ(~:delete_if, &key)
     end
   end
 
@@ -104,6 +133,7 @@ class ArchiviaController < Transmission::BaseController
   # @todo: per velocizzare usare questa gemma fast_excel
   #
   def make_file(data, type)
+    binding.pry
     return Success(nil) if data.nil?
     try! do
       workbook  = RubyXL::Parser.parse("./template/template.xlsx")
@@ -121,6 +151,7 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def make_path(file, type)
+    binding.pry
     return Success(nil) if file.nil?
     try! do
       folder = type == "match" ? Transmission::Config.path.match : Transmission::Config.path.nomatch
@@ -132,10 +163,11 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def write_xlsx(file, path)
-    return Success(nil) if file.nil?
+  def write_xlsx(workbook, path)
+    binding.pry
+    return Success(nil) if workbook.nil?
     try! do
-      file.write(path)
+      workbook.write(path)
     end
   end
 
@@ -243,13 +275,13 @@ class ArchiviaController < Transmission::BaseController
   #
   def get_sheet(file)
     filter = ->(row) {row[1] == "LIN" &&  row[2] == "400 kV"}
-    try! do 
+    try! do
       file.
         ᐅ(~:sheets).
         ᐅ(~:first).
         ᐅ(~:rows).
         ᐅ(~:drop, 5).
-        ᐅ(~:keep_if, &filter)                         
+        ᐅ(~:keep_if, &filter)
     end
   end
 
@@ -306,7 +338,6 @@ class ArchiviaController < Transmission::BaseController
   def archivia_remit(remit_terna)
     try! do
       remit_terna.each do |row|
-        
         row.freeze
         nome_terna = row[:nome]
 
@@ -338,7 +369,7 @@ class ArchiviaController < Transmission::BaseController
       ᐅ(~:find, {"properties.nome_terna" => nome_terna}).
       ᐅ(~:limit, 1).
       ᐅ(~:to_a)
-  
+
     if doc.empty?
       logger.warn "Per #{nome_terna} non ho trovato nessun id".red
       Success(nil)
@@ -401,14 +432,13 @@ class ArchiviaController < Transmission::BaseController
       return Failure("Questa remit non viene archiviata a DB".red)
     end
 
-    if salvo_nome_in_db? 
+    if salvo_nome_in_db?
       salva_nome_terna(id_transmission, nome)
       Success(id_transmission)
     else
       @no_archiviate << row
       Failure("Utente non vuole salvare il nome della linea a DB")
     end
-
   end
 
   #
@@ -451,7 +481,7 @@ class ArchiviaController < Transmission::BaseController
   # per le performance
   #
   def make_doc(row, id, unique_id)
-    try! do 
+    try! do
       rm_decison = ->(hash) { hash.delete_if { |k,v| k == :decision } }
       row.
         ᐅ(~:dup).

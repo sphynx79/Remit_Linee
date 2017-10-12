@@ -5,11 +5,11 @@
   <title>Report Remit Transmission</title>
 </head>
 <body>
-  <% if defined? match -%>
+  <%  if (defined? match) && !(match.nil?) -%>
     <table style="border: 2px solid #000000; border-collapse: collapse;">
       <thead>
         <tr style="border: 2px solid #000000;">
-          <td colspan="7" align="center" style="font-family:Arial, Helvetica, sans-serif; font-size:18px; font-weight: bold; color: white; background-color: #4BA65C; padding-top: 5px; padding-bottom: 5px;">Remit con match</td>
+          <td colspan="8" align="center" style="font-family:Arial, Helvetica, sans-serif; font-size:18px; font-weight: bold; color: white; background-color: #4BA65C; padding-top: 5px; padding-bottom: 5px;">Remit con match</td>
         </tr>
         <tr style="background-color: #4BA65C;">
             <% match.first.each_key do |k| -%>
@@ -30,7 +30,7 @@
                   when "reason"          then "814px" 
                   when "possibile_match" then "240px" 
                 end -%>
-              <td nowrap style="border-left: 2px solid #000000; <% if i != (nomatch.size)-1 -%>border-bottom: 1px solid #5A5A5A;<% end -%>; padding: 5px 10px 5px 10px; font-family:Arial, Helvetica, sans-serif; font-size:12px; width: <%= width %>;"><%= v.to_s %></td>
+              <td nowrap style="border-left: 2px solid #000000; <% if i != (match.size)-1 -%>border-bottom: 1px solid #5A5A5A;<% end -%>; padding: 5px 10px 5px 10px; font-family:Arial, Helvetica, sans-serif; font-size:12px; width: <%= width %>;"><%= v.to_s %></td>
             <% end -%>
           </tr>
         <% end -%>
@@ -39,39 +39,6 @@
   <% end -%>
   <br>
   <br>
-
-    <% if defined? nomatch -%>
-    <table style="border: 2px solid #000000; border-collapse: collapse;">
-      <thead>
-        <tr style="border: 2px solid #000000;">
-          <td colspan="7" align="center" style="font-family:Arial, Helvetica, sans-serif; font-size:18px; font-weight: bold; color: white; background-color: #A51E25; padding-top: 5px; padding-bottom: 5px;">Remit senza match</td>
-        </tr>
-        <tr style="background-color: #A51E25;">
-            <% nomatch.first.each_key do |k| -%>
-            <th style="color: white; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight: bold; border: 2px solid #000000; padding: 5px 12px 5px 12px;"><%= k.to_s %></th>
-            <% end -%>
-        </tr>
-      </thead>
-      <tbody>
-        <% nomatch.each_with_index do |p,i| -%>
-          <tr style="<% if i.odd? -%>background-color: #F5C8BF<% end -%>">
-            <% p.each do |k, v| -%>
-               <% width = case  k.to_s
-                  when "nome"            then "242px"
-                  when "volt"            then "76px" 
-                  when "dt_upd"          then "120px" 
-                  when "start_dt"        then "120px" 
-                  when "end_dt"          then "120px" 
-                  when "reason"          then "814px" 
-                  when "possibile_match" then "240px" 
-                end -%>
-              <td nowrap style="border-left: 2px solid #000000; <% if i != (nomatch.size)-1 -%>border-bottom: 1px solid #5A5A5A;<% end -%>; padding: 5px 10px 5px 10px; font-family:Arial, Helvetica, sans-serif; font-size:12px; width: <%= width %>;"><%= v.to_s %></td>
-            <% end -%>
-          </tr>
-        <% end -%>
-      </tbody>
-    </table>
-  <% end -%>
 </body>
 </html>
 

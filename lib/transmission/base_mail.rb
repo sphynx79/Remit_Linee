@@ -38,34 +38,37 @@ module Transmission
 
       from    = 'michele.boscolo@eni.com'
       to      = 'michele.boscolo@eni.com'
-      subject = 'Linee remit non associate'
+      oggi    = (DateTime.now).strftime("%d-%m-%Y")
+      subject = "Linee remit non associate #{oggi}"
 
       marker = "AUNIQUEMARKER"
-
-      # Define the main headers.
-      head =<<~EOF
-      From: #{from}
-      To: #{to}
-      Subject: Message with Excel Attachment
-      MIME-Version: 1.0
-      Content-Type: multipart/mixed; boundary=#{marker}
-      --#{marker}
+        head =<<~EOF
+        From: #{from}
+        To: #{to}
+        Subject: #{subject}
+        MIME-Version: 1.0
+        Content-Type: multipart/mixed; boundary=#{marker}
+        --#{marker}
       EOF
 
 
       if match_path != nil
-        file_name          = match_path.split("/").last
-        file_match         = File.open(match_path, 'rb')
-        file_content_match = file_match.read()
+        file_match            = File.open(match_path, 'rb')
+        file_content_match    = file_match.read()
         encoded_content_match = [file_content_match].pack("m*")   # base64
-        match_attach =<<~EOF
-        Content-Type: application/vnd.ms-excel; name=\"#{file_name}\"
-        Content-Transfer-Encoding: base64
-        Content-Disposition: attachment; filename="#{file_name}"
-        Content-Description: "#{file_name}"
+        file_name             = match_path.
+                                  ᐅ(~:split,"/").
+                                  ᐅ(~:last).
+                                  ᐅ(~:sub, /match/,'adjust')
 
-        #{encoded_content_match}
-        --#{marker}
+        match_attach =<<~EOF
+          Content-Type: application/vnd.ms-excel; name=\"#{file_name}\"
+          Content-Transfer-Encoding: base64
+          Content-Disposition: attachment; filename="#{file_name}"
+          Content-Description: "#{file_name}"
+
+          #{encoded_content_match}
+          --#{marker}
         EOF
       end
 
@@ -90,10 +93,10 @@ module Transmission
 
       # Define the message action
       body =<<~HTML
-      Content-Type: text/html; charset=UTF-8
+        Content-Type: text/html; charset=UTF-8
 
-      #{message}
-      --#{marker}--
+        #{message}
+        --#{marker}--
       HTML
 
       # match_attach   = file_match.nil? ? "" : match_attach

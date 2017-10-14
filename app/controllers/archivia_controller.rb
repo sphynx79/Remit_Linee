@@ -8,8 +8,6 @@ class ArchiviaController < Transmission::BaseController
   def start
     @files  = lista_file
 
-    # $stdout = File.open(File::NULL, "w")
-
     (exit! 2) unless there_is_file?
 
     result = @files.map do |file|

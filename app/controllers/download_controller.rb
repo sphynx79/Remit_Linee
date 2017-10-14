@@ -13,7 +13,14 @@ class DownloadController < Transmission::BaseController
 
   def remote_files
     begin
-      page.css('#dnn_ctr5896_TernaViewDocumentView_grdDocument_ctl00 > tbody > tr')
+      tr = page.css('#dnn_ctr5896_TernaViewDocumentView_grdDocument_ctl00 > tbody > tr')
+      if tr.empty? 
+       raise <<~HEREDOC
+        Attenzione controlare la pagina da dove scarico i file deve essere cambiata
+        probabilmente e cambiata perche non riesco a trovare nessun file da scaricare
+       HEREDOC
+      end
+       tr
     rescue => e
       Success([Failure(e)]) >> method(:formatta) >> method(:stampa)
       exit!
@@ -98,7 +105,7 @@ class DownloadController < Transmission::BaseController
       else
         if r.value.class.ancestors.include? Exception
           bkt = r.value.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0]
-          msg << (r.value.original_message + "\n" + bkt).red
+          msg << (r.value.message + "\n" + bkt).red
           
         else
           msg << r.value.red

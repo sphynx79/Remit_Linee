@@ -2,6 +2,19 @@
 
 # STDOUT.sync = true
 
+
+class NoArchivate
+  attr_accessor :match, :no_match
+  attr_reader :file
+
+  def initialize(file)
+    @file     = file
+    @match    = []
+    @no_match = []
+  end
+
+end
+
 class ArchiviaController < Transmission::BaseController
   extend Memoist
 
@@ -11,7 +24,7 @@ class ArchiviaController < Transmission::BaseController
     (exit! 2) unless there_is_file?
 
     result = @files.map do |file|
-      @no_archiviate = []
+      @no_archiviate = NoArchivate.new(file)
       in_sequence do
         get(:remit)              { leggi_remit(file)                      }
         and_then                 { archivia_remit(remit)                  }
@@ -19,21 +32,15 @@ class ArchiviaController < Transmission::BaseController
         # controlla e gestisce le remit che non sono state
         # archviate ma non hanno un match
         get(:match)              { get_match_no_archiviate                }
-        get(:match_path)         { make_file_xlsx(file, match: match)            }
-
-        # get(:workbook_match)     { make_file(match, "match")              }
-        # get(:match_path)         { make_path(file, "match")               }
-        # and_then                 { write_xlsx(workbook_match, match_path) }
+        get(:match_path)         { make_file_xlsx(file, match: match)     }
 
         # controlla e gestisce le remit che non sono state
         # archviate e non hanno nessin match
-        # get(:nomatch)            { get_nomatch_no_archiviate              }
-        # get(:workbook_nomatch)   { make_file(nomatch, "nomatch")          }
-        # get(:nomatch_path)       { make_path(file, "nomatch")             }
-        # and_then                 { write_xlsx(workbook_nomatch, nomatch_path) }
-
+        get(:nomatch)            { get_nomatch_no_archiviate              }
+        get(:nomatch_path)       { make_file_xlsx(file, nomatch: nomatch)     }
+      
         # Invio Email
-        and_then                 { make_report(match_path, match)  }
+        and_then                 { make_report(match_path, match, nomatch_path, nomatch)  }
         # Sposta il file originale
         and_then                 { sposta_file(file)                      }
 
@@ -51,7 +58,6 @@ class ArchiviaController < Transmission::BaseController
 
 
   def make_file_xlsx(file, **data)
-    binding.pry
     return Success(nil) if data.values[0].nil?
     type = data.keys[0].to_s
     data = data.values[0]
@@ -63,18 +69,17 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  def make_report(match_path, match)
-    if match_path.nil?
+  def make_report(match_path, match, nomatch_path, nomatch)
+    if match_path.nil? && nomatch_path.nil?
       return Success(nil)
     end
 
     try! do
-      match = sanitize(match)
+      match   = sanitize(match)   if match
+      nomatch = sanitize(nomatch) if nomatch
       html  = ERB.new(File.read("./template/report.html.erb"),nil, '-').result(binding)
       
-      binding.pry
-
-      Transmission::BaseMail.send(html, match_path)
+      Transmission::BaseMail.send(html, match_path, nomatch_path)
     end
   end
 
@@ -110,28 +115,17 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def get_match_no_archiviate
-    if @no_archiviate.empty?
-      Success(nil)
-    else
-      group  = @no_archiviate.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
-      Success(group[:match])
-    end
+    @no_archiviate.match.empty? ? Success(nil) : Success(@no_archiviate.match)
   end
 
   def get_nomatch_no_archiviate
-    if @no_archiviate.empty?
-      Success(nil)
-    else
-      group  = @no_archiviate.group_by do |x| x[:possibile_match] == "nessuno" ? :nomatch : :match end
-      Success(group[:nomatch])
-    end
+    @no_archiviate.no_match.empty? ? Success(nil) : Success(@no_archiviate.no_match)
   end
 
   #
   # @todo: per velocizzare usare questa gemma fast_excel
   #
   def make_file(data, type)
-    binding.pry
     return Success(nil) if data.nil?
     try! do
       workbook  = RubyXL::Parser.parse("./template/template.xlsx")
@@ -149,7 +143,6 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def make_path(file, type)
-    binding.pry
     return Success(nil) if file.nil?
     try! do
       folder = type == "match" ? Transmission::Config.path.match : Transmission::Config.path.nomatch
@@ -162,7 +155,6 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def write_xlsx(workbook, path)
-    binding.pry
     return Success(nil) if workbook.nil?
     try! do
       workbook.write(path)
@@ -395,7 +387,7 @@ class ArchiviaController < Transmission::BaseController
     if trovato.nil?
       logger.info "Non trovo nessuna linea"
       row[:possibile_match] = 'nessuno'
-      @no_archiviate << row
+      @no_archiviate.no_match << row
       return Failure("Questa remit non viene archiviata a DB".red)
     end
 
@@ -403,7 +395,7 @@ class ArchiviaController < Transmission::BaseController
       logger.info("Trovato: #{trovato[0].dig("properties","nome")}")
       logger.info("Score troppo basso: #{trovato[1].to_s} #{trovato[2].to_s}".red)
       row[:possibile_match] = 'nessuno'
-      @no_archiviate << row
+      @no_archiviate.no_match << row
       return Failure("Questa remit non viene archiviata a DB".red)
     end
 
@@ -422,11 +414,12 @@ class ArchiviaController < Transmission::BaseController
     if row[:decision] == "NO"
       logger.info("Sto leggendo un file adjust")
       logger.info("In decision ho NO")
+      @no_archiviate.match << row
       return Failure("Questa remit non viene archiviata a DB".red)
     end
 
     if $INTERFACE == "scheduler"
-      @no_archiviate << row
+      @no_archiviate.match << row
       return Failure("Questa remit non viene archiviata a DB".red)
     end
 
@@ -434,7 +427,7 @@ class ArchiviaController < Transmission::BaseController
       salva_nome_terna(id_transmission, nome)
       Success(id_transmission)
     else
-      @no_archiviate << row
+      @no_archiviate.match << row
       Failure("Utente non vuole salvare il nome della linea a DB")
     end
   end

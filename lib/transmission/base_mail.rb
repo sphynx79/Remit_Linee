@@ -32,7 +32,7 @@
 module Transmission
 
   class BaseMail
-    def self.send(message, match_path)
+    def self.send(message, match_path, nomatch_path)
 
       p "Prepara invio email"
 
@@ -55,7 +55,7 @@ module Transmission
       if match_path != nil
         file_match            = File.open(match_path, 'rb')
         file_content_match    = file_match.read()
-        encoded_content_match = [file_content_match].pack("m*")   # base64
+        encoded_content_match = [file_content_match].pack("m*")
         file_name             = match_path.
                                   ᐅ(~:split,"/").
                                   ᐅ(~:last).
@@ -72,22 +72,23 @@ module Transmission
         EOF
       end
 
-      # if file_nomatch != nil
-      #   nomatch = file_nomatch.split("/").last
-      #   file_nomatch  = File.open(file_nomatch, 'rb')
-      #   file_content_nomatch = file_nomatch.read()
-      #   encoded_content_nomatch = [file_content_nomatch].pack("m*")   # base64
-      #   # Define the attachment section
-      #   nomatch_attach =<<~EOF
-      #   Content-Type: application/vnd.ms-excel; name=\"#{nomatch}\"
-      #   Content-Transfer-Encoding: base64
-      #   Content-Disposition: attachment; filename="#{nomatch}"
-      #   Content-Description: "#{nomatch}"
-      #
-      #   #{encoded_content_nomatch}
-      #   --#{marker}
-      #   EOF
-      # end
+      if nomatch_path != nil
+        file_nomatch            = File.open(nomatch_path, 'rb')
+        file_content_nomatch    = file_nomatch.read()
+        encoded_content_nomatch = [file_content_nomatch].pack("m*")
+        file_name               = nomatch_path.
+                                    ᐅ(~:split,"/").
+                                    ᐅ(~:last)
+        nomatch_attach =<<~EOF
+          Content-Type: application/vnd.ms-excel; name=\"#{file_name}\"
+          Content-Transfer-Encoding: base64
+          Content-Disposition: attachment; filename="#{file_name}"
+          Content-Description: "#{file_name}"
+
+          #{encoded_content_nomatch}
+          --#{marker}
+        EOF
+      end
 
 
 
@@ -99,11 +100,10 @@ module Transmission
         --#{marker}--
       HTML
 
-      # match_attach   = file_match.nil? ? "" : match_attach
-      # nomatch_attach = file_nomatch.nil? ? "" : nomatch_attach
-      # msg = head + match_attach + nomatch_attach + body
-      
-      msg = head + match_attach + body
+       match_attach   = match_path.nil? ? "" : match_attach
+       nomatch_attach = nomatch_path.nil? ? "" : nomatch_attach
+
+      msg = head + match_attach + nomatch_attach  + body
 
       begin
         Net::SMTP.start('relay.eni.pri', 25) do |smtp|

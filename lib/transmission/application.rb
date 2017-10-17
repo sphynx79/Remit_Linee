@@ -14,8 +14,8 @@ module Transmission
 
       def controller
         controller_name = env[:controller].
-                          ᐅ(~:capitalize).
-                          ᐅ(~:+, 'Controller')
+                            ᐅ(~:capitalize).
+                            ᐅ(~:+, 'Controller')
 
        Object.const_get(controller_name)
       end

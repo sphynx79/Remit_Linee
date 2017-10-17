@@ -2,14 +2,68 @@ class DownloadController < Transmission::BaseController
   extend Memoist
 
   def start
-    
+    s3_sync(type: 'fetch')
+
     result = remote_files.map do |row|
       download_file(row)
     end
+
+    downlod_nothing?(result)
+    
     Success(result) >> method(:formatta) >> method(:stampa)
   end
 
   private
+
+  def s3_sync(type: nil)
+     result = in_sequence do
+          and_then    { aws_exist?         }
+          get(:cmd)   { cmd_comand(type)   }
+          and_then    { avvio(cmd)           }
+          and_yield   { Success("Sincronizzato corretamente")          }
+      end
+     if result.failure?
+       print result.value
+       exit!
+     end
+  end
+  
+  def aws_exist?
+    (try! {run("which aws")}).map { |ctx|
+      msg     = ctx[0]
+      trovato = ctx[1]
+      trovato ? Success("Trovato aws: " + msg) : Failure("aws non trovato devi installare aws-cli")
+    }
+  end
+
+  def avvio(cmd)
+    (try! {run(cmd)}).map { |ctx|
+      msg    = ctx[0]
+      status = ctx[1]
+      status ? Success(0) : Failure("Problema nella sincronizzazione dei file con S3: \n"+msg)
+    }
+  end
+
+  def cmd_comand(type)
+    case type
+    when 'fetch' then Success("aws s3 sync s3://#{bucket} #{download_path} --only-show-errors")
+    when 'push'  then Success("aws s3 sync #{download_path} s3://#{bucket} --delete --only-show-errors")
+    else
+      Failure("Type non riconosciuto")
+    end
+  end
+
+  def run(cmd)
+    try! do
+      logger.debug("run: "+cmd)
+      stdout, status = Open3.capture2e(cmd)
+      return stdout.strip, status.success?
+    end
+  end
+
+  def bucket
+    Transmission::Config.s3.bucket
+  end
 
   def remote_files
     begin
@@ -136,9 +190,18 @@ class DownloadController < Transmission::BaseController
     Transmission::Config.url.site
   end
 
+  def downlod_nothing?(result)
+    unless result.detect do |x| x.success? end
+      Yell['scheduler'].warn("Nessun file da scaricare")
+      false
+    end
+    true
+  end
+
   memoize :site
   memoize :page
   memoize :download_path
   memoize :archivio_path
+  memoize :bucket
 
 end

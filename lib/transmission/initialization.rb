@@ -30,7 +30,7 @@ module Transmission
       def load_helper
         Dir[APP_ROOT.join('app', 'helper', '*.rb')].each do |helper_file|
           filename = File.basename(helper_file).gsub('.rb', '')
-          Object.autoload ActiveSupport::Inflector.camelize(filename), helper_file
+           Object.autoload ActiveSupport::Inflector.camelize(filename), helper_file
         end
       end
 

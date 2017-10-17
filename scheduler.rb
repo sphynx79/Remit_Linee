@@ -37,11 +37,11 @@ class Handler
   end
 
   def start_task
-    $logger.debug "start tasks"
+    $logger.debug "Start tasks"
       @actions.each do |action|
-        $logger.debug "action: #{action}"
+        $logger.debug " - #{action}:"
         break unless process_is_ok(action)
-        $logger.debug "task #{action} finito corretamente"
+        $logger.debug " - #{action} finito corretamente"
       end
   end
 
@@ -49,17 +49,17 @@ class Handler
     exit_status, err, out = start_process(action)
 
     if (out != nil) &&  (out != "")
-      $logger.info " #{out.strip}"
+      $logger.info "  * #{out.strip}"
     end
 
-    if exit_status != 0
-      if exit_status != 2
+    if (exit_status != 0) && (exit_status != 2)
+    
         $logger.warn err.chomp
         p "Invio email"
         # Email.send(err, action, controparte)
-      else
-        $logger.info " nessun file da archiviare"
-      end
+      # else
+      #   # $logger.info " nessun file da archiviare"
+      # end
       return false
     end
     return true
@@ -82,7 +82,7 @@ end
 
 task = Handler.new(actions: ["download", "archivia"])
 
-scheduler.every('5s', task, :timeout => '5m', :tag  => 'task')
+scheduler.every('15s', task, :timeout => '5m', :tag  => 'task')
 
 puts "Start Scheduler"
 

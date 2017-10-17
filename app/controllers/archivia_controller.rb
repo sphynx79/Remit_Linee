@@ -22,28 +22,18 @@ class ArchiviaController < Transmission::BaseController
     @files  = lista_file
 
     (exit! 2) unless there_is_file?
-
+    
     result = @files.map do |file|
       @no_archiviate = NoArchivate.new(file)
       in_sequence do
-        get(:remit)              { leggi_remit(file)                      }
-        and_then                 { archivia_remit(remit)                  }
-
-        # controlla e gestisce le remit che non sono state
-        # archviate ma non hanno un match
-        get(:match)              { get_match_no_archiviate                }
-        get(:match_path)         { make_file_xlsx(file, match: match)     }
-
-        # controlla e gestisce le remit che non sono state
-        # archviate e non hanno nessin match
-        get(:nomatch)            { get_nomatch_no_archiviate              }
-        get(:nomatch_path)       { make_file_xlsx(file, nomatch: nomatch)     }
-      
-        # Invio Email
-        and_then                 { make_report(match_path, match, nomatch_path, nomatch)  }
-        # Sposta il file originale
-        and_then                 { sposta_file(file)                      }
-
+        get(:remit)              { leggi_remit(file)                                          }
+        and_then                 { archivia_remit(remit)                                      }
+        get(:match)              { get_match_no_archiviate                                    }
+        get(:match_path)         { make_file_xlsx(file, match: match)                         }
+        get(:nomatch)            { get_nomatch_no_archiviate                                  }
+        get(:nomatch_path)       { make_file_xlsx(file, nomatch: nomatch)                     }
+        and_then                 { make_report(match_path, match, nomatch_path, nomatch)      }
+        and_then                 { sposta_file(file)                                          }
         and_yield                { Success("Archiviata #{file.split("/").last} con successo") }
       end
     end
@@ -55,7 +45,6 @@ class ArchiviaController < Transmission::BaseController
   ######################################
   #      METODI UTILIZZO VARIO         #
   ######################################
-
 
   def make_file_xlsx(file, **data)
     return Success(nil) if data.values[0].nil?
@@ -204,6 +193,19 @@ class ArchiviaController < Transmission::BaseController
   #  METODI PER LETTURA FILE REMIT     #
   ######################################
 
+  #
+  # Legge il file della remit
+  # 
+  # @param file  [String] "./excel_file//remit_YYYY_M_D.xlsx"
+  # 
+  # @note in_sequence:
+  #         - open_xlsx
+  #         - get_sheet
+  #         - get_dt_upd
+  #         - get_values
+  #
+  # @return [Success(Array<Hash>)] ogni riga e un elemento del mio array
+  #
   def leggi_remit(file)
     in_sequence do
       get(:xlsx)      { open_xlsx(file)            }
@@ -219,8 +221,8 @@ class ArchiviaController < Transmission::BaseController
   #
   def there_is_file?
     if @files.empty?
-      print "non trovo nessun file remit\n"
-      return false
+      Yell['scheduler'].warn("Nessun file da archviare")
+      false
     end
     true
   end
@@ -233,7 +235,10 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
-  # Legge il file della remit
+  # Prende i valori che mi interessano presenti nello sheet
+  # 
+  # @param sheet  [Array]
+  # @param dt_upd [DateTime]
   #
   # @return [Array<Hash>] ogni riga e un elemento del mio array
   #

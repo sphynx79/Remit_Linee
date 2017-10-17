@@ -108,6 +108,11 @@ module Transmission
       Yell.new(name: Object, format: false) do |l|
         l.adapter STDERR, colors: true, level: 'gte.fatal'
       end
+      Yell.new(name: 'scheduler', format: false) do |l|
+        l.adapter STDOUT, colors: false, level: 'at.warn'
+        l.adapter STDERR, colors: false, level: 'at.error'
+        # l.adapter :file, 'log/application.log', level: 'at.fatal', format: false
+       end
     else
       Yell.new(name: Object, format: false) do |l|
         l.adapter STDOUT, level: "gte.#{level} lte.error"
@@ -128,7 +133,7 @@ module Transmission
 
   def set_development
     # @todo: vedere se lasciare ENV['GLI_DEBUG'] = true
-    ENV['GLI_DEBUG'] = 'false'
+    ENV['GLI_DEBUG'] = 'true'
     require 'ap'
     require 'pry'
   end

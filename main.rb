@@ -23,6 +23,7 @@ require 'lib/transmission'
 require 'tty-prompt'
 require 'net/smtp'
 require 'rubyXL'
+require 'open3'
 # require 'pretty_backtrace'
 #
 # PrettyBacktrace.enable

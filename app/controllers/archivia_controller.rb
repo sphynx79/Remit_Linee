@@ -17,17 +17,12 @@ end
 
 class ArchiviaController < Transmission::BaseController
   extend Memoist
+  include SyncHelper
 
   def start
     lista_file.ᐅ method(:exit_if_not_files)
-    exit
-    files = lista_file
-
-     exit_if_not_file
-
-    (exit! 2) unless there_is_file?
     
-    result = files.map do |file|
+    result = lista_file.map do |file|
       @no_archiviate = NoArchivate.new(file)
       in_sequence do
         get(:remit)              { leggi_remit(file)                                          }
@@ -38,6 +33,7 @@ class ArchiviaController < Transmission::BaseController
         get(:nomatch_path)       { make_file_xlsx(file, nomatch: nomatch)                     }
         and_then                 { make_report(match_path, match, nomatch_path, nomatch)      }
         and_then                 { sposta_file(file)                                          }
+        and_then                 { sync(type: 'push')                                        }
         and_yield                { Success("Archiviata #{file.split("/").last} con successo") }
       end
     end
@@ -596,5 +592,6 @@ class ArchiviaController < Transmission::BaseController
   memoize :coll_transmission
   memoize :coll_remit
   memoize :all_line
-  #
+  memoize :lista_file
+  
 end

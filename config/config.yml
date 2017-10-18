@@ -9,8 +9,8 @@ defaults: &defaults
     archivio: './excel_file/Archivio/'
     match:    './excel_file/Match/'
     nomatch:  './excel_file/NoMatch/'
-  s3:
-    bucket: 'transmission15102017'
+    sync:     'C:/Users/en27553/Desktop/pc2'
+
   url:
     site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
 

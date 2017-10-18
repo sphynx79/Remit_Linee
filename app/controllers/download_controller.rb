@@ -1,9 +1,10 @@
 class DownloadController < Transmission::BaseController
   extend Memoist
-  include S3Helper
+  include SyncHelper
 
   def start
-    s3_sync(type: 'fetch')
+    # @todo: se non ha sincronizzato nessun file non fa nulla
+    sync(type: 'fetch')
 
     result = remote_files.map do |row|
       download_file(row)
@@ -110,7 +111,7 @@ class DownloadController < Transmission::BaseController
   end
 
   def page
-    Nokogiri::HTML(open(site))
+    Nokogiri::HTML(open(site, {ssl_verify_mode: 0}))
   end
 
   def download_path

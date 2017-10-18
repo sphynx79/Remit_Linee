@@ -19,11 +19,15 @@ class ArchiviaController < Transmission::BaseController
   extend Memoist
 
   def start
-    @files  = lista_file
+    lista_file.ᐅ method(:exit_if_not_files)
+    exit
+    files = lista_file
+
+     exit_if_not_file
 
     (exit! 2) unless there_is_file?
     
-    result = @files.map do |file|
+    result = files.map do |file|
       @no_archiviate = NoArchivate.new(file)
       in_sequence do
         get(:remit)              { leggi_remit(file)                                          }
@@ -41,6 +45,25 @@ class ArchiviaController < Transmission::BaseController
   end
 
   private
+
+  #
+  # Lista dei file presenti nella cartella download
+  #
+  def lista_file
+    Dir.glob(Transmission::Config.path.download + "/*.xlsx")
+  end
+
+
+  #
+  # Controllo se ho almeno un file da leggere
+  # se non ci sono file esce
+  #
+  def exit_if_not_files(files)
+    if files.empty?
+      Yell['scheduler'].warn("Nessun file da archiviare")
+      (exit! 2) 
+    end
+  end
 
   ######################################
   #      METODI UTILIZZO VARIO         #
@@ -216,23 +239,8 @@ class ArchiviaController < Transmission::BaseController
     end
   end
 
-  #
-  # Controllo se ho almeno un file da leggere
-  #
-  def there_is_file?
-    if @files.empty?
-      Yell['scheduler'].warn("Nessun file da archviare")
-      false
-    end
-    true
-  end
 
-  #
-  # Lista dei file presenti nella cartella download
-  #
-  def lista_file
-    Dir.glob(Transmission::Config.path.download + "/*.xlsx")
-  end
+
 
   #
   # Prende i valori che mi interessano presenti nello sheet

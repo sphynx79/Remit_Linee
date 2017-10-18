@@ -26,7 +26,7 @@ module SyncHelper
 
     def cmd_comand(type, sync_folder)
       case type
-      when 'fetch' then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /mir #{sync_folder} #{download_path} ")
+      when 'fetch' then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /mir #{sync_folder} #{download_path} /FFT")
       when 'push'  then Success("robocopy /mir #{download_path} #{sync_folder}")
       else
         Failure("Type non riconosciuto")
@@ -37,7 +37,7 @@ module SyncHelper
       (try! {run(cmd)}).map { |ctx|
         msg    = ctx[0]
         status = ctx[1]
-        (status.exitstatus < 7) ? Success(0) : Failure("Problema nella sincronizzazione dei file con robocopy: \n"+msg)
+        (status.exitstatus < 7) ? Success(0) : Failure("Problema nella sincronizzazione dei file con rubocopy: \n"+msg)
       }
     end
 

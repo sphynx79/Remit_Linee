@@ -5,7 +5,7 @@ class DownloadController < Transmission::BaseController
   def start
     # @todo: se non ha sincronizzato nessun file non fa nulla
     # https://social.technet.microsoft.com/wiki/contents/articles/1073.robocopy-and-a-few-examples.aspx
-    sync(type: 'fetch')
+     (exit!) if sync(type: 'fetch').failure?
 
     result = remote_files.map do |row|
       download_file(row)
@@ -102,9 +102,7 @@ class DownloadController < Transmission::BaseController
   def downlod_nothing?(result)
     unless result.detect do |x| x.success? end
       Yell['scheduler'].warn("Nessun file da scaricare")
-      false
     end
-    true
   end
 
   def site

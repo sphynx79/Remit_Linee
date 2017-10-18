@@ -26,8 +26,8 @@ module SyncHelper
 
     def cmd_comand(type, sync_folder)
       case type
-      when 'fetch' then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /mir #{sync_folder} #{download_path} /FFT")
-      when 'push'  then Success("robocopy /mir #{download_path} #{sync_folder}")
+      when 'fetch' then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /fft /e #{sync_folder} #{download_path} ")
+      when 'push'  then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /fft /mir #{download_path} #{sync_folder}")
       else
         Failure("Type non riconosciuto")
       end
@@ -51,7 +51,9 @@ module SyncHelper
 
     if result.failure?
       print result.value
-      exit!
+      Failure(0)
+    else
+      Success(0)
     end
   end
 
@@ -62,5 +64,10 @@ module SyncHelper
       return stdout.strip, status
     end
   end
+
+  def download_path
+    File.expand_path(Transmission::Config.path.download, APP_ROOT)
+  end
+
 
 end

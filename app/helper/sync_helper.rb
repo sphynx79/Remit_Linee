@@ -7,6 +7,16 @@ module SyncHelper
 
   def sync(type: nil)
 
+    def in_sequence_sync(type)
+      in_sequence do
+        and_then          { robocop_exist?                        }
+        get(:sync_folder) { get_sync_folder                       }
+        get(:cmd)         { cmd_comand(type, sync_folder)         }
+        and_then          { avvio(cmd)                            }
+        and_yield         { Success("Sincronizzato corretamente") }
+      end
+    end
+
     def robocop_exist?
       (try! {run("which robocopy")}).map { |ctx|
         msg     = ctx[0]
@@ -26,8 +36,8 @@ module SyncHelper
 
     def cmd_comand(type, sync_folder)
       case type
-      when 'fetch' then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /fft /e #{sync_folder} #{download_path} ")
-      when 'push'  then Success("robocopy /njh /njs /ndl /nc /ns /np /nfl /fft /mir #{download_path} #{sync_folder}")
+      when 'fetch' then Success(%{robocopy /njh /njs /ndl /nc /ns /np /nfl /fft /e "#{sync_folder}" "#{download_path}"})
+      when 'push'  then Success(%{robocopy /njh /njs /ndl /nc /ns /np /nfl /fft /mir "#{download_path}" "#{sync_folder}"})
       else
         Failure("Type non riconosciuto")
       end
@@ -41,33 +51,26 @@ module SyncHelper
       }
     end
 
-    result = in_sequence do
-      and_then          { robocop_exist?                        }
-      get(:sync_folder) { get_sync_folder                       }
-      get(:cmd)         { cmd_comand(type, sync_folder)         }
-      and_then          { avvio(cmd)                            }
-      and_yield         { Success("Sincronizzato corretamente") }
-    end
+    result = in_sequence_sync(type)
 
     if result.failure?
-      print result.value
-      Failure(0)
+      Failure(result.value)
     else
-      Success(0)
+      Success(result.value)
     end
-  end
+
+  end #END sync
 
   def run(cmd)
     try! do
-      logger.debug("run: "+cmd)
+      logger.debug("run: " + cmd)
       stdout, status = Open3.capture2e(cmd)
       return stdout.strip, status
     end
   end
 
   def download_path
-    File.expand_path(Transmission::Config.path.download, APP_ROOT)
+    @download_path ||= File.expand_path(Transmission::Config.path.download, APP_ROOT)
   end
-
 
 end

@@ -9,7 +9,7 @@ defaults: &defaults
     archivio: './excel_file/Archivio/'
     match:    './excel_file/Match/'
     nomatch:  './excel_file/NoMatch/'
-    sync:     'C:/Users/en27553/Desktop/pc2'
+    sync:     '//ennf1002/unitagp/MEOR/QLIKVIEW/05b REPORT MAPPA ITALIA/remit_terna'
 
   url:
     site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 

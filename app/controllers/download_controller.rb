@@ -84,6 +84,7 @@ class DownloadController < Transmission::BaseController
       try! {rem_file.close}
     end
 
+    row = row.dup.freeze
     in_sequence do
       get(:data)            { data(row) }
       get(:path)            { file_archivio(data) }

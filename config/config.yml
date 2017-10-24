@@ -4,6 +4,7 @@ defaults: &defaults
     adress: '127.0.0.1'
     port: '27018'
     log_level: "::Logger::INFO"
+
   path:
     download: './excel_file/'
     archivio: './excel_file/Archivio/'
@@ -13,6 +14,12 @@ defaults: &defaults
 
   url:
     site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
+
+  mail:
+    from: 'michele.boscolo@eni.com'
+    to: 'michele.boscolo@eni.com'
+    server: 'relay.eni.pri'
+    port: 25
 
 development:
   <<: *defaults

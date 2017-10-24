@@ -23,11 +23,17 @@ Decision = Deterministic::enum {
 class ArchiviaController < Transmission::BaseController
   extend Memoist
   include SyncHelper
+  include ReportHelper
 
   def start
-    exit_if_not_files
+    begin
+      exit_if_not_files
 
-    archivia
+      archivia
+    rescue => e
+      logger.fatal(e.message)
+      logger.fatal(e.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0])
+    end
   end
 
   private
@@ -100,7 +106,17 @@ class ArchiviaController < Transmission::BaseController
       # @return[SimpleXlsxReader::Document]
       #
       def open_xlsx(file)
-        try! {SimpleXlsxReader.open(file)}
+        begin
+          xlsx = SimpleXlsxReader.open(file)
+          Success(xlsx)
+        rescue => e
+          file_path = File.expand_path(file, APP_ROOT)
+          message = <<~HEREDOC
+            Non sono riuscito ad aprire il file #{file_path}
+            Scaricarlo a mano dal sito e controllare che non sia corrotto
+          HEREDOC
+          Failure(message)
+        end
       end
 
       #
@@ -607,16 +623,13 @@ class ArchiviaController < Transmission::BaseController
     #
     def make_report(match_path, match, nomatch_path, nomatch)
       if match_path.nil? && nomatch_path.nil?
-        return Success(nil)
+        return Success(0)
       end
 
-      try! do
-        match   = sanitize(match)   if match
-        nomatch = sanitize(nomatch) if nomatch
-        html  = ERB.new(File.read("./template/report.html.erb"),nil, '-').result(binding)
+      make_html  = MakeHtml.new(match, nomatch)
+      send_email = SendEmail.new(match_path, nomatch_path)
 
-        Transmission::BaseMail.send(html, match_path, nomatch_path)
-      end
+      make_html.call() >> ->(html) { send_email.call(html) }
     end
 
     #
@@ -648,23 +661,6 @@ class ArchiviaController < Transmission::BaseController
   #
   def lista_file
     Dir.glob(Transmission::Config.path.download + "/*.xlsx")
-  end
-
-  def sanitize(data)
-    to = ->(v) {
-      case v
-      when DateTime then v.strftime("%d/%m/%Y %R")
-      when String   then v.gsub(/linea/i, "")
-      else v
-      end
-    }
-    key = ->(k,_) { k == :decision }
-
-    sanitize_match = data.map do |row|
-      row.
-        ᐅ(~:transform_values!, &to).
-        ᐅ(~:delete_if, &key)
-    end
   end
 
   def doc_to_excel_row(row)

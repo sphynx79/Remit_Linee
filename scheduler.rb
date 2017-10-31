@@ -6,7 +6,6 @@
 require 'rufus-scheduler'
 require 'logger'
 require 'open3'
-require 'pry'
 
 $logger = Logger.new(STDOUT)
 $logger.level = Logger::DEBUG
@@ -37,11 +36,10 @@ class Handler
   end
 
   def start_task
-    $logger.debug "Start tasks"
       @actions.each do |action|
-        $logger.debug " - #{action}:"
+        $logger.debug "Start task #{action}:"
         break unless process_is_ok(action)
-        $logger.debug " - #{action} finito corretamente"
+        $logger.debug " - finito corretamente"
       end
   end
 
@@ -49,7 +47,7 @@ class Handler
     exit_status, err, out = start_process(action)
 
     if (out != nil) &&  (out != "")
-      $logger.info "  * #{out.strip}"
+      $logger.info "  - #{out.strip}"
     end
 
     if (exit_status != 0) && (exit_status != 2)
@@ -66,7 +64,7 @@ class Handler
   end
 
   def start_process(action)
-    cmd = "ruby main.rb --interface=scheduler #{action} "
+    cmd = "C:/Ruby24_mappa/bin/ruby.exe main.rb --interface=scheduler --enviroment=production #{action} "
     stdout, stderr, wait_thr = Open3.capture3(cmd)
     return  wait_thr.exitstatus, stderr, stdout
   end
@@ -74,7 +72,7 @@ class Handler
 end
 
 # @todo diminuire la frequenza di rufus-scheduler
-scheduler = Rufus::Scheduler.new(:frequency => "5s")
+scheduler = Rufus::Scheduler.new(:frequency => "1h")
 
 def scheduler.on_error(job, error)
   $logger.warn("intercepted error in #{job.id}: #{error.message}")
@@ -82,7 +80,7 @@ end
 
 task = Handler.new(actions: ["download", "archivia"])
 
-scheduler.every('15s', task, :timeout => '5m', :tag  => 'task')
+scheduler.every('8h', task, :timeout => '5m', :tag  => 'task')
 
 puts "Start Scheduler"
 

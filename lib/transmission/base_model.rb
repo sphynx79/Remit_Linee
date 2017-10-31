@@ -22,10 +22,9 @@ module Transmission
     #
     def connect_db
       begin
-        adress   = Transmission::Config.database.adress
-        port     = Transmission::Config.database.port
+        address  = Transmission::Config.database.select {|k,v| /adress/i =~ k}.values 
         database = Transmission::Config.database.name
-        client   = Mongo::Client.new(["#{adress}:#{port}"],
+        client   = Mongo::Client.new(address,
                                    database: database,
                                    server_selection_timeout: 5,
                                    :write => {:w => 1, :j => false}) #@todo vedere se mettere w => 0, setto la modalità unacknowledged

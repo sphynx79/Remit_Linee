@@ -25,5 +25,5 @@ IF NOT EXIST "%transmission_folder%" (
     ECHO %~n0: file not found - %transmission_folder% >&2
     EXIT /B 1
 )
-START %conemu_exe% /icon %conemu_ico% /title "Transmission"  /loadcfgfile %conemu_cfgfile% /cmd cmd /k "%conemu_init% && cd /D %transmission_folder% && %ruby% %app% -v archivia"
+START %conemu_exe% /icon %conemu_ico% /title "Transmission"  /loadcfgfile %conemu_cfgfile% /cmd cmd /k "%conemu_init% && cd /D %transmission_folder% && %ruby% %app% --enviroment=production archivia"
 

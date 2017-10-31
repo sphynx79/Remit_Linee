@@ -5,8 +5,8 @@ class DownloadController < Transmission::BaseController
   def start
     # @todo: se non ha sincronizzato nessun file non fa nulla
     # https://social.technet.microsoft.com/wiki/contents/articles/1073.robocopy-and-a-few-examples.aspx
-     (exit!) if sync(type: 'fetch').failure?
-
+   sync(type: 'fetch')
+  
     result = remote_files.map do |row|
       download_file(row)
     end

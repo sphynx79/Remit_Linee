@@ -24,6 +24,7 @@ require 'tty-prompt'
 require 'net/smtp'
 require 'rubyXL'
 require 'open3'
+require 'ap'
 # require 'pretty_backtrace'
 #
 # PrettyBacktrace.enable
@@ -135,7 +136,6 @@ module Transmission
   def set_development
     # @todo: vedere se lasciare ENV['GLI_DEBUG'] = true
     ENV['GLI_DEBUG'] = 'true'
-    require 'ap'
     require 'pry'
   end
 

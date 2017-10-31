@@ -1,8 +1,7 @@
 defaults: &defaults
   database:
     name: 'transmission'
-    adress: '127.0.0.1'
-    port: '27018'
+    adress: '127.0.0.1:27030'
     log_level: "::Logger::INFO"
 
   path:
@@ -10,7 +9,7 @@ defaults: &defaults
     archivio: './excel_file/Archivio/'
     match:    './excel_file/Match/'
     nomatch:  './excel_file/NoMatch/'
-    sync:     '//ennf1002/unitagp/MEOR/QLIKVIEW/05b REPORT MAPPA ITALIA/remit_terna'
+    sync:     'C:/Users/en27553/Desktop/pc2'
 
   url:
     site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
@@ -30,6 +29,16 @@ test:
 
 production:
   <<: *defaults
+  database:
+    name: 'transmission'
+    adress1: '10.130.96.220:27018'
+    adress2: '10.130.96.220:27019'
+    adress3: '10.130.96.144:27018'
+    log_level: "::Logger::INFO"
+  path:
+    download: './excel_file/'
+    archivio: './excel_file/Archivio/'
+    match:    './excel_file/Match/'
+    nomatch:  './excel_file/NoMatch/'
+    sync: '//ennf1002/unitagp/MEOR/QLIKVIEW/05b REPORT MAPPA ITALIA/remit_terna'
 
-
- 

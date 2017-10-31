@@ -17,7 +17,7 @@ SET conemu_ico=%CMDER_ROOT%\icons\cmder.ico
 SET conemu_cfgfile=%CMDER_ROOT%\config\ConEmu.xml
 SET conemu_init=%CMDER_ROOT%\vendor\init.bat
 SET ruby=C:\Ruby24_mappa\bin\ruby.exe
-SET app= %transmission_folder%main.rb
+SET app= %transmission_folder%scheduler.rb
 SET argv=%*
 
 
@@ -25,5 +25,5 @@ IF NOT EXIST "%transmission_folder%" (
     ECHO %~n0: file not found - %transmission_folder% >&2
     EXIT /B 1
 )
-START %conemu_exe% /icon %conemu_ico% /title "Transmission"  /loadcfgfile %conemu_cfgfile% /cmd cmd /k "%conemu_init% && cd /D %transmission_folder% && %ruby% %app% --enviroment=production download"
+START %conemu_exe% /icon %conemu_ico% /title "Transmission Sceduler"  /loadcfgfile %conemu_cfgfile% /cmd cmd /k "%conemu_init% && cd /D %transmission_folder% && %ruby% %app%"
 

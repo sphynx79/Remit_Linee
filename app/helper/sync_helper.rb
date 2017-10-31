@@ -8,21 +8,29 @@ module SyncHelper
   def sync(type: nil)
 
     def in_sequence_sync(type)
-      in_sequence do
+      result = in_sequence do
         and_then          { robocop_exist?                        }
         get(:sync_folder) { get_sync_folder                       }
         get(:cmd)         { cmd_comand(type, sync_folder)         }
         and_then          { avvio(cmd)                            }
         and_yield         { Success("Sincronizzato corretamente") }
       end
+      if result.failure?
+        logger.info(result.to_s)
+        (exit!)
+      end
     end
 
     def robocop_exist?
-      (try! {run("which robocopy")}).map { |ctx|
+      begin
+      (try! {run("where robocopy")}).map { |ctx|
         msg     = ctx[0]
         trovato = ctx[1]
         trovato.success? ? Success("Trovato robocopy: " + msg) : Failure("robocopy non trovato")
       }
+      rescue => e
+        Failure("problema nel cercare robocopy")
+      end
     end
 
     def get_sync_folder

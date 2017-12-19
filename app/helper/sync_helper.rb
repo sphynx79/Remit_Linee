@@ -19,6 +19,7 @@ module SyncHelper
         logger.info(result.to_s)
         (exit!)
       end
+      return result
     end
 
     def robocop_exist?
@@ -60,7 +61,7 @@ module SyncHelper
     end
 
     result = in_sequence_sync(type)
-
+   
     if result.failure?
       Failure(result.value)
     else

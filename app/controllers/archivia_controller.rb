@@ -25,8 +25,11 @@ class ArchiviaController < Transmission::BaseController
   include SyncHelper
   include ReportHelper
 
+  attr_reader :linee_380
+
   def start
     begin
+      @linee_380 = coll_transmission
       exit_if_not_files
 
       archivia
@@ -236,17 +239,14 @@ class ArchiviaController < Transmission::BaseController
       def transmission_id(nome_terna)
         try! do
           logger.info "Cerco per #{nome_terna} l'id della linea nel db transmission"
+          
+          doc = linee_380.lazy.select{|f| f[:properties][:nome_terna].include?(nome_terna) }.first
 
-          doc = coll_transmission.
-            ᐅ(~:find, {"properties.nome_terna" => nome_terna}).
-            ᐅ(~:limit, 1).
-            ᐅ(~:to_a)
-
-          if doc.empty?
+          if doc.nil?
             logger.warn "Per #{nome_terna} non ho trovato nessun id".red
             Success(nil)
           else
-            id = doc_id(doc)
+            id = doc[:id]
             logger.info "Trovato per #{nome_terna} => #{id}".green
             Success(id)
           end
@@ -283,14 +283,14 @@ class ArchiviaController < Transmission::BaseController
             let(:scheduler)       { $INTERFACE == "scheduler"                                    }
             get(:type_decion)     { get_type_decision(decision, scheduler)                       }
             let(:action)          { get_action(type_decion)                                      }
-            get(:type_decion)     { esegui_action(action, row_with_match, id_transmission, nome) }
+            get(:type_decion)     { esegui_action(action, row_with_match, match, nome) }
             and_yield             { Success(id_transmission)                                     }
           end
         end
 
-        def esegui_action(action, row_with_match, id_transmission, nome)
-          case action
-          when "salva"        then salva_nome_terna(id_transmission, nome)
+        def esegui_action(action, row_with_match, match_line, nome)
+         case action
+          when "salva"        then salva_nome_terna(match_line, nome)
           when "insert_match" then insert_match(row_with_match)
           else
             Failure("Action non eseguibile")
@@ -314,7 +314,7 @@ class ArchiviaController < Transmission::BaseController
 
         def get_id_terna(nome)
           id = nome.match(/\d{3}/)
-          id = id ? "" : id[0]
+          id = id.nil? ? "" : id[0]
           Success(id.to_s)
         end
 
@@ -343,7 +343,9 @@ class ArchiviaController < Transmission::BaseController
           try! do
             # @todo: ho utilizzato per all_line la memoize vedere se puo dare problemi
             # in caso inserisco una linea e ho la stassa linea nello stesso file
-            fuzzy_match = FuzzyMatch.new(all_line, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+            reader = lambda { |record| record[:properties][:nome]}
+            # fuzzy_match = FuzzyMatch.new(all_line, :read => reader, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+            fuzzy_match = FuzzyMatch.new(linee_380,:read => reader, :groupings => [/#{id_terna}/], :must_match_grouping => true)
             fuzzy_match.find_with_score(nome)
           end
         end
@@ -382,7 +384,7 @@ class ArchiviaController < Transmission::BaseController
         end
 
         def get_nome(match)
-          try!{match[0].dig("properties","nome")}
+          try!{ match[0].dig(:properties,:nome)}
         end
 
         #
@@ -419,29 +421,40 @@ class ArchiviaController < Transmission::BaseController
         end
 
         def get_id_transmission(match)
-          try!{ match[0]["_id"] }
+          try!{ match[0][:id] }
         end
 
         #
         # Salva il nome che ha trovato nel DB transmission
         # e restitusce Success("ok")
         #
-        def salva_nome_terna(id_transmission, nome)
-          try! do
+        def salva_nome_terna(match_line, nome)
             logger.debug "Salvo il nome_terna a db"
 
-            doc_id_transmission   = coll_transmission.find({_id: id_transmission}).limit(1)
-            array_nome_terna_size = doc_id_transmission.first.dig("properties","nome_terna").size
+            # doc_id_transmission   = coll_transmission.find({_id: id_transmission}).limit(1)
+            array_nome_terna_size = match_line[0][:properties][:nome_terna].size
 
             logger.info "Attenzione questa linee ha gia #{array_nome_terna_size} nomi" if array_nome_terna_size > 0
+            id   = match_line[0][:id]
+            match_line[0][:properties][:nome_terna].push(nome)
 
-            result = doc_id_transmission.update_one({'$addToSet' => {"properties.nome_terna": nome}})
+            json =  match_line[0].to_json
 
-            if result.modified_count == 1
+            url  = "https://api.mapbox.com/datasets/v1/browserino/cj9l3jgn21kwg33s2edl2pe0o/features/#{id}?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+            
+            uri  = URI.parse(url)
+            http = Net::HTTP.new(uri.host, uri.port)
+            http.use_ssl = true
+            request = Net::HTTP::Put.new(uri)
+            request.body = json
+            request.set_content_type("application/json")
+            response = http.request(request)
+            if response.kind_of? Net::HTTPSuccess
               logger.info "nome_terna #{nome} salvato nel db"
+              Success("Salvato nome terna a db")
+            else
+              Failure("Errore nel salvataggio nome linea a db")
             end
-            Success("Salvato nome terna a db")
-          end
         end
 
         # Mi chiede se voglio salvare la linea a db
@@ -521,13 +534,6 @@ class ArchiviaController < Transmission::BaseController
         # result.n
         logger.info("Archiviato la linea a db".green)
         Success(0)
-      end
-
-      #
-      # Mi estrae l'id dal documento
-      #
-      def doc_id(doc)
-        doc[0]["_id"]
       end
 
       sequence_scan_for_archive(remit_terna)
@@ -739,7 +745,9 @@ class ArchiviaController < Transmission::BaseController
   # Seleziono la collezzione transmission
   #
   def coll_transmission
-    db.collection(collection: "transmission")
+    url = "https://api.mapbox.com/datasets/v1/browserino/cj9l3jgn21kwg33s2edl2pe0o/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+    geojson = open(url, {ssl_verify_mode: 0}).read
+    Oj.load(geojson, :symbol_keys => true, :mode => :compat)[:features]
   end
 
   #
@@ -757,7 +765,7 @@ class ArchiviaController < Transmission::BaseController
   end
 
   memoize :db
-  memoize :coll_transmission
+  # memoize :coll_transmission
   memoize :coll_remit
   memoize :all_line
   memoize :lista_file

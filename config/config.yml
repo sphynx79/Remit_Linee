@@ -1,16 +1,4 @@
 defaults: &defaults
-  database:
-    name: 'transmission'
-    adress: '127.0.0.1:27030'
-    log_level: "::Logger::INFO"
-
-  path:
-    download: './excel_file/'
-    archivio: './excel_file/Archivio/'
-    match:    './excel_file/Match/'
-    nomatch:  './excel_file/NoMatch/'
-    sync:     'C:/Users/en27553/Desktop/pc2'
-
   url:
     site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
 
@@ -22,7 +10,17 @@ defaults: &defaults
 
 development:
   <<: *defaults
-  altro: 800
+  database:
+    name: 'transmission'
+    adress: '127.0.0.1:27030'
+    log_level: "::Logger::INFO"
+
+  path:
+    download: './excel_file/'
+    archivio: './excel_file/Archivio/'
+    match:    './excel_file/Match/'
+    nomatch:  './excel_file/NoMatch/'
+    sync:     './excel_file_dev'
 
 test:
   <<: *defaults

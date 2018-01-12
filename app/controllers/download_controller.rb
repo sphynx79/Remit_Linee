@@ -5,8 +5,8 @@ class DownloadController < Transmission::BaseController
   def start
     # @todo: se non ha sincronizzato nessun file non fa nulla
     # https://social.technet.microsoft.com/wiki/contents/articles/1073.robocopy-and-a-few-examples.aspx
-   sync(type: 'fetch')
-  
+    sync(type: 'fetch')
+
     result = remote_files.map do |row|
       download_file(row)
     end
@@ -23,9 +23,9 @@ class DownloadController < Transmission::BaseController
       tr = page.css('#dnn_ctr5896_TernaViewDocumentView_grdDocument_ctl00 > tbody > tr')
       if tr.empty?
         raise <<~HEREDOC
-                Attenzione controlare la pagina da dove scarico i file deve essere cambiata
-                probabilmente e cambiata perche non riesco a trovare nessun file da scaricare
-              HEREDOC
+        Attenzione controlare la pagina da dove scarico i file deve essere cambiata
+        probabilmente e cambiata perche non riesco a trovare nessun file da scaricare
+        HEREDOC
       end
       tr
     rescue => e
@@ -39,11 +39,11 @@ class DownloadController < Transmission::BaseController
       arr_str = λ{|a| "#{a[2]}_#{a[1]}_#{a[0]}"}
       try!{
         row.
-          ᐅ(~:css, 'td[2]').
-          ᐅ(~:text).
-          ᐅ(~:gsub, "/", "_").
-          ᐅ(~:split, "_").
-          ᐅ(arr_str)
+        ᐅ(~:css, 'td[2]').
+        ᐅ(~:text).
+        ᐅ(~:gsub, "/", "_").
+        ᐅ(~:split, "_").
+        ᐅ(arr_str)
       }
     end
 
@@ -99,10 +99,10 @@ class DownloadController < Transmission::BaseController
       and_yield             { Success("Scaricamento #{path.split("/").last} con successo") }
     end
   end
-  
+
   def downlod_nothing?(result)
     unless result.detect do |x| x.success? end
-      Yell['scheduler'].warn("Nessun file da scaricare")
+    Yell['scheduler'].warn("Nessun file da scaricare")
     end
   end
 

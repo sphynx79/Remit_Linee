@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+# encoding: utf-8
 
 # STDOUT.sync = true
 
@@ -29,7 +30,7 @@ class ArchiviaController < Transmission::BaseController
 
   def start
     begin
-      @linee_380 = coll_transmission
+      @linee_380 = transmission_380
       exit_if_not_files
 
       archivia
@@ -238,6 +239,7 @@ class ArchiviaController < Transmission::BaseController
       #
       def transmission_id(nome_terna)
         try! do
+
           logger.info "Cerco per #{nome_terna} l'id della linea nel db transmission"
           
           doc = linee_380.lazy.select{|f| f[:properties][:nome_terna].include?(nome_terna) }.first
@@ -440,7 +442,7 @@ class ArchiviaController < Transmission::BaseController
 
             json =  match_line[0].to_json
 
-            url  = "https://api.mapbox.com/datasets/v1/browserino/cj9l3jgn21kwg33s2edl2pe0o/features/#{id}?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+            url  = "https://api.mapbox.com/datasets/v1/browserino/cjcb6ahdv0daq2xnwfxp96z9t/features/#{id}?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
             
             uri  = URI.parse(url)
             http = Net::HTTP.new(uri.host, uri.port)
@@ -744,8 +746,8 @@ class ArchiviaController < Transmission::BaseController
   #
   # Seleziono la collezzione transmission
   #
-  def coll_transmission
-    url = "https://api.mapbox.com/datasets/v1/browserino/cj9l3jgn21kwg33s2edl2pe0o/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+  def transmission_380
+    url     = "https://api.mapbox.com/datasets/v1/browserino/cjcb6ahdv0daq2xnwfxp96z9t/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
     geojson = open(url, {ssl_verify_mode: 0}).read
     Oj.load(geojson, :symbol_keys => true, :mode => :compat)[:features]
   end
@@ -771,3 +773,4 @@ class ArchiviaController < Transmission::BaseController
   memoize :lista_file
 
 end
+

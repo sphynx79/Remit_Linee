@@ -337,17 +337,21 @@ class ArchiviaController < Transmission::BaseController
         # il nome che piu assomiglia al nome della linea che sto leggendo
         #
         # @param id_terna [String]
-        # @param nome     [String]
+        # @param nome     [String]  | nome della linea che deve cercare
         #
         # @return [Array<Hash>] =>  [{"_id"=>BSON::ObjectId('5957c...'), "properties"=>{"nome"=>"005 nome_linea"}}, score1, score2]
         #
         def fuzzy_search_line(id_terna, nome)
           try! do
             # @todo: ho utilizzato per all_line la memoize vedere se puo dare problemi
-            # in caso inserisco una linea e ho la stassa linea nello stesso file
+            # in caso inserisco una linea e ho la stessa linea nello stesso file
             reader = lambda { |record| record[:properties][:nome]}
-            # fuzzy_match = FuzzyMatch.new(all_line, :read => reader, :groupings => [/#{id_terna}/], :must_match_grouping => true)
-            fuzzy_match = FuzzyMatch.new(linee_380,:read => reader, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+            # if nome.match /filisur/
+              # binding.pry
+            # end
+
+            # fuzzy_match = FuzzyMatch.new(linee_380,:read => reader, :groupings => [/#{id_terna}/], :must_match_grouping => true)
+            fuzzy_match = FuzzyMatch.new(linee_380,:read => reader)
             fuzzy_match.find_with_score(nome)
           end
         end
@@ -364,7 +368,7 @@ class ArchiviaController < Transmission::BaseController
           if match.nil?
             logger.info "Non trovo nessuna linea"
             Success(nil)
-          elsif (match[1] < 0.16) && (match[2] < 0.16)
+          elsif (match[1] < 0.4) && (match[2] < 0.4)
             logger.info("Trovato: #{match[0].dig("properties","nome")}")
             logger.info("Score troppo basso: #{match[1].to_s} #{match[2].to_s}".red)
             Success(nil)

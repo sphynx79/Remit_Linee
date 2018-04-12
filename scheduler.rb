@@ -64,7 +64,7 @@ class Handler
   end
 
   def start_process(action)
-    cmd = "C:/Ruby24_mappa/bin/ruby.exe main.rb --interface=scheduler --enviroment=production #{action} "
+    cmd = "#{RbConfig.ruby} main.rb --interface=scheduler --enviroment=production #{action} "
     stdout, stderr, wait_thr = Open3.capture3(cmd)
     return  wait_thr.exitstatus, stderr, stdout
   end

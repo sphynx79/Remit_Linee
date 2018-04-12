@@ -1,0 +1,10 @@
+CHANGELOG.md export-ignore
+Gemfile export-ignore
+Gemfile.lock export-ignore
+ruby.ico  export-ignore
+VERSION  export-ignore
+*.gitattributes  export-ignore
+.rubocop.yml export-ignore
+archivia.bat export-ignore
+download.bat export-ignore
+scheduler.bat export-ignore

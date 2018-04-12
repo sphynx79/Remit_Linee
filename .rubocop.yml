@@ -1,0 +1,51 @@
+AllCops:
+  TargetRubyVersion: 2.3
+  Exclude:
+    - 'vendor/**/*'
+    - 'test/**/*'
+    - 'script/**/*'
+    - '.git/**/*'
+    - 'db/**/*'
+    - 'tmp/**/*'
+    - 'bin/**/*'
+    - 'lib/backup/**/*'
+    - 'lib/ci/backup/**/*'
+    - 'lib/tasks/**/*'
+    - 'lib/ci/migrate/**/*'
+    - 'lib/email_validator.rb'
+    - 'lib/gitlab/upgrader.rb'
+    - 'lib/gitlab/seeder.rb'
+    - 'generator_templates/**/*'  
+Metrics/LineLength:
+  Max: 230
+Metrics/BlockLength:
+  Enabled: false
+Style/PercentLiteralDelimiters:
+  PreferredDelimiters:
+    '%i': '[]'
+    '%w': '[]'
+    '%W': '[]'
+Style/Documentation:
+  Enabled: false
+Metrics/MethodLength:
+  Enabled: false
+Metrics/ClassLength:
+  Enabled: false
+Metrics/PerceivedComplexity:
+  Enabled: false
+Metrics/CyclomaticComplexity:
+  Enabled: false
+Metrics/AbcSize:
+  Enabled: false
+Metrics/ModuleLength:
+  Enabled: false
+Style/GuardClause:
+  Enabled: false
+Style/VariableNumber:
+  Enabled: false
+EndOfLine:
+  Enabled: false
+Style/GlobalVars:
+  Enabled: false
+Style/Semicolon:
+  Enabled: false

@@ -8,11 +8,10 @@ class NoArchivate
   attr_reader :file
 
   def initialize(file)
-    @file     = file
-    @match    = []
+    @file = file
+    @match = []
     @no_match = []
   end
-
 end
 
 Decision = Deterministic::enum {
@@ -26,11 +25,12 @@ class ArchiviaController < Transmission::BaseController
   include SyncHelper
   include ReportHelper
 
-  attr_reader :linee_380
+  attr_reader :linee_380, :linee_220
 
   def start
     begin
-      @linee_380 = transmission_380
+      @linee_380 = leggi_dataset_mapbox("380")
+      @linee_220 = leggi_dataset_mapbox("220")
       exit_if_not_files
 
       archivia
@@ -60,19 +60,19 @@ class ArchiviaController < Transmission::BaseController
     def in_sequence_archivia
       lista_file.map do |file|
         @no_archiviate = NoArchivate.new(file)
-        @bulk_op       = []
+        @bulk_op = []
         in_sequence do
-          get(:remit)              { leggi_remit(file)                                          }
-          and_then                 { scan_for_archive(remit)                                    }
-          and_then                 { write_bulk_op                                              }
-          get(:match)              { get_match                                                  }
-          get(:match_path)         { make_file_xlsx(file, match: match)                         }
-          get(:nomatch)            { get_nomatch                                                }
-          get(:nomatch_path)       { make_file_xlsx(file, nomatch: nomatch)                     }
-          and_then                 { make_report(match_path, match, nomatch_path, nomatch)      }
-          and_then                 { sposta_file(file)                                          }
-          and_then                 { sincronizzazione                                           }
-          and_yield                { Success("Archiviata #{file.split("/").last} con successo") }
+          get(:remit) { leggi_remit(file) }
+          and_then { scan_for_archive(remit) }
+          and_then { write_bulk_op }
+          get(:match) { get_match }
+          get(:match_path) { make_file_xlsx(file, match: match) }
+          get(:nomatch) { get_nomatch }
+          get(:nomatch_path) { make_file_xlsx(file, nomatch: nomatch) }
+          and_then { make_report(match_path, match, nomatch_path, nomatch) }
+          and_then { sposta_file(file) }
+          and_then { sincronizzazione }
+          and_yield { Success("Archiviata #{file.split("/").last} con successo") }
         end
       end
     end
@@ -96,11 +96,11 @@ class ArchiviaController < Transmission::BaseController
     def leggi_remit(file)
       def in_sequence_leggi_remit(file)
         in_sequence do
-          get(:xlsx)      { open_xlsx(file)            }
-          get(:sheet)     { get_sheet(xlsx)            }
-          get(:dt_upd)    { get_dt_upd(file)           }
-          get(:values)    { get_values(sheet, dt_upd)  }
-          and_yield       { Success(values)            }
+          get(:xlsx)   { open_xlsx(file) }
+          get(:sheet)  { get_sheet(xlsx) }
+          get(:dt_upd) { get_dt_upd(file) }
+          get(:values) { get_values(sheet, dt_upd) }
+          and_yield    { Success(values) }
         end
       end
 
@@ -133,7 +133,7 @@ class ArchiviaController < Transmission::BaseController
       # @return [Array<Array>]
       #
       def get_sheet(file)
-        filter = ->(row) {row[1] == "LIN" &&  row[2] == "400 kV"}
+        filter = -> (row) { row[1] == "LIN" && (row[2] == "400 kV" || row[2] == "220 kV") }
         try! do
           file.
             ᐅ(~:sheets).
@@ -171,16 +171,16 @@ class ArchiviaController < Transmission::BaseController
       def get_values(sheet, dt_upd)
         try! do
           sheet.map do |row|
-            nome       = row[0]
-            volt       = row[2]
+            nome = row[0]
+            volt = row[2].match?("400") ? "380" : "220" 
             start_date = (row[3].is_a? String) ? Date.parse(row[3]) : row[3]
             start_time = (row[4].is_a? String) ? Time.parse(row[4]) : row[4]
-            end_date   = (row[5].is_a? String) ? Date.parse(row[5]) : row[5]
-            end_time   = (row[6].is_a? String) ? Time.parse(row[6]) : row[6]
-            reason     = row[8]
-            decision   = row[10]
-            start_dt   = to_datetime(start_date, start_time)
-            end_dt     = to_datetime(end_date, end_time)
+            end_date = (row[5].is_a? String) ? Date.parse(row[5]) : row[5]
+            end_time = (row[6].is_a? String) ? Time.parse(row[6]) : row[6]
+            reason = row[8]
+            decision = row[10]
+            start_dt = to_datetime(start_date, start_time)
+            end_dt = to_datetime(end_date, end_time)
             {nome: nome, volt: volt, dt_upd: dt_upd, start_dt: start_dt, end_dt: end_dt, reason: reason, decision: decision}
           end
         end
@@ -210,39 +210,44 @@ class ArchiviaController < Transmission::BaseController
         remit_terna.each do |row|
           row.freeze
           nome_terna = row[:nome]
+          volt = row[:volt]
 
           result = in_sequence do
-            get(:id_trovato)   { transmission_id(nome_terna)                           }
-            get(:id)           { id_trovato ? Success(id_trovato) : possibili_id(row)  }
-            get(:ui)           { unique_id(row)                                        }
-            and_then           { check_exist_in_db(ui)                                 }
-            get(:doc)          { make_doc(row, id, ui)                                 }
-            and_then           { insert_in_bulk_op(doc)                                }
-            and_yield          { Success("Archiviata con successo")                    }
+            get(:id_trovato) { transmission_id(nome_terna, volt) }
+            get(:id) { id_trovato ? Success(id_trovato) : possibili_id(row) }
+            get(:ui) { unique_id(row) }
+            and_then { check_exist_in_db(ui) }
+            get(:doc) { make_doc(row, id, ui) }
+            and_then { insert_in_bulk_op(doc) }
+            and_yield { Success("Archiviata con successo") }
           end
 
           logger.warn(result.to_s) if (result.failure?)
 
-          logger.info "\n"+ "#"*80 + "\n"
+          logger.info "\n" + "#" * 80 + "\n"
         end
         Success(0)
       end
 
       #
-      # Cerca nella collezione transmission il nome della linea
+      # Cerca nel dataset di mapbox il nome della linea
       #
       # @param nome_terna [String]
+      # @param volt [String]
       #
       # Success(nil) => @return [Success(nil)]            | non ha trovato nessuna linea
       # Success(id)  => @return [Success(BSON::ObjectId)] | id della linea che ha trovato
       # Failure(e)   => @return [Failure(Exception)]      | uscita inaspettata ritorna l'eccezione
       #
-      def transmission_id(nome_terna)
+      def transmission_id(nome_terna, volt)
         try! do
+          logger.info "Cerco per #{nome_terna} l'id della linea nel database"
 
-          logger.info "Cerco per #{nome_terna} l'id della linea nel db transmission"
-          
-          doc = linee_380.lazy.select{|f| f[:properties][:nome_terna].include?(nome_terna) }.first
+          if volt.match? /380/
+            doc = linee_380.lazy.select { |f| f[:properties][:nome_terna].include?(nome_terna) }.first
+          else
+            doc = linee_220.lazy.select { |f| f[:properties][:nome_terna].include?(nome_terna) }.first
+          end
 
           if doc.nil?
             logger.warn "Per #{nome_terna} non ho trovato nessun id".red
@@ -269,62 +274,85 @@ class ArchiviaController < Transmission::BaseController
 
         def sequence_possibili_id(row)
           nome = row[:nome]
-          row  = row.dup
+          volt = row[:volt]
+          row = row.dup
 
           in_sequence do
-            get(:id_terna)        { get_id_terna(nome)                                           }
-            get(:nome_clean)      { get_nome_clean(nome)                                         }
-            observe               { logger.info "nome linea:      #{nome}".rjust(5)              }
-            get(:match)           { fuzzy_search_line(id_terna, nome_clean)                      }
-            get(:trovato)         { trovato?(match)                                              }
-            get(:nome_match)      { trovato ? get_nome(match) : insert_no_match(row)             }
-            observe               { logger.info("Trovato a db:    " + nome_match)                }
-            get(:row_with_match)  { add_nome_match_to_row(row, nome_match)                       }
-            get(:id_transmission) { get_id_transmission(match)                                   }
-            get(:decision)        { check_decison(row)                                           }
-            let(:scheduler)       { $INTERFACE == "scheduler"                                    }
-            get(:type_decion)     { get_type_decision(decision, scheduler)                       }
-            let(:action)          { get_action(type_decion)                                      }
-            get(:type_decion)     { esegui_action(action, row_with_match, match, nome) }
-            and_yield             { Success(id_transmission)                                     }
+            get(:id_terna)        { get_id_terna(nome) }
+            get(:nome_clean)      { get_nome_clean(nome) }
+            observe               { logger.info "nome linea:      #{nome}".rjust(5) }
+            get(:match)           { fuzzy_search_line(id_terna, nome_clean, volt) }
+            get(:trovato)         { trovato?(match) }
+            get(:nome_match)      { trovato ? get_nome(match) : insert_no_match(row) }
+            observe               { logger.info("Trovato a db:    " + nome_match) }
+            get(:row_with_match)  { add_nome_match_to_row(row, nome_match) }
+            get(:id_transmission) { get_id_transmission(match) }
+            get(:decision)        { check_decison(row) }
+            let(:scheduler)       { $INTERFACE == "scheduler" }
+            get(:type_decion)     { get_type_decision(decision, scheduler) }
+            let(:action)          { get_action(type_decion) }
+            get(:type_decion)     { esegui_action(action, row_with_match, match, nome, volt) }
+            and_yield             { Success(id_transmission) }
           end
         end
 
-        def esegui_action(action, row_with_match, match_line, nome)
-         case action
-          when "salva"        then salva_nome_terna(match_line, nome)
+        def esegui_action(action, row_with_match, match_line, nome, volt)
+          case action
+          when "salva" then salva_nome_terna(match_line, nome, volt)
           when "insert_match" then insert_match(row_with_match)
           else
             Failure("Action non eseguibile")
           end
         end
 
+        #
+        # Uso il Decision type creato con Deterministic::enum e setto lo stato della decsione
+        #
+        # @param decision[String]
+        # @param scheduler[Boolean]
+        #
+        # @return Success[Decision::type] | es: Forse(false)
+        #
         def get_type_decision(decision, scheduler)
           try! do
             Decision.send(decision, scheduler)
           end
         end
 
+        #
+        # Setta il tipo di azzione da eseguire
+        #
         def get_action(action)
           action.match {
-            Si()                        { "salva" }
-            No()                        { "insert_match"     }
-            Forse(where { s == true })  { |s| "insert_match" }
+            Si() { "salva" }
+            No() { "insert_match" }
+            Forse(where { s == true }) { |s| "insert_match" }
             Forse(where { s == false }) { |s| salvo_nome_in_db ? "salva" : "insert_match" }
           }
         end
 
+        #
+        # Cerca dal nome che ha letto dalla remit l'id
+        #
+        # es: "Linea 219 Bussolengo SS  -  Ferrara 456" => 219
+        #
+        # @return [Success(id)] | id estratto dal nome
+        #
         def get_id_terna(nome)
           id = nome.match(/\d{3}/)
           id = id.nil? ? "" : id[0]
           Success(id.to_s)
         end
 
+        #
+        # Pulisce il nome della linea
+        #
         def get_nome_clean(nome)
           try! do
             nome = nome.dup
             nome.downcase!
             nome.sub!("linea 400 kv ", "")
+            nome.sub!("linea 220 kv ", "")
             nome.sub!("linea ", "")
             nome.sub!(/l\s/, "")
             nome.strip!
@@ -336,22 +364,27 @@ class ArchiviaController < Transmission::BaseController
         # Utilizza la gemma fuzzymatch per cercare tra tutte le linee che ho in anagrafica
         # il nome che piu assomiglia al nome della linea che sto leggendo
         #
-        # @param id_terna [String]
+        # @param id_terna [String]  | id_terna della linea che deve cercare
         # @param nome     [String]  | nome della linea che deve cercare
+        # @param volt     [String]  | volt della linea che deve cercare
         #
         # @return [Array<Hash>] =>  [{"_id"=>BSON::ObjectId('5957c...'), "properties"=>{"nome"=>"005 nome_linea"}}, score1, score2]
         #
-        def fuzzy_search_line(id_terna, nome)
+        def fuzzy_search_line(id_terna, nome, volt)
           try! do
             # @todo: ho utilizzato per all_line la memoize vedere se puo dare problemi
             # in caso inserisco una linea e ho la stessa linea nello stesso file
-            reader = lambda { |record| record[:properties][:nome]}
-            # if nome.match /filisur/
-              # binding.pry
-            # end
+            reader = lambda { |record| record[:properties][:nome] }
 
             # fuzzy_match = FuzzyMatch.new(linee_380,:read => reader, :groupings => [/#{id_terna}/], :must_match_grouping => true)
-            fuzzy_match = FuzzyMatch.new(linee_380,:read => reader)
+            # @todo: renderlo piu sicuro controllando se non e ne 380 ne 220 adesso controlla
+            # solo se e 380 o altro
+            if volt.match?("380")
+              fuzzy_match = FuzzyMatch.new(linee_380, :read => reader)
+            else
+              fuzzy_match = FuzzyMatch.new(linee_220, :read => reader)
+            end
+
             fuzzy_match.find_with_score(nome)
           end
         end
@@ -368,8 +401,8 @@ class ArchiviaController < Transmission::BaseController
           if match.nil?
             logger.info "Non trovo nessuna linea"
             Success(nil)
-          elsif (match[1] < 0.4) && (match[2] < 0.4)
-            logger.info("Trovato: #{match[0].dig("properties","nome")}")
+          elsif (match[1] < 0.7) && (match[2] < 0.7)
+            logger.info("Trovato:      #{match[0].dig(:properties, :nome)}")
             logger.info("Score troppo basso: #{match[1].to_s} #{match[2].to_s}".red)
             Success(nil)
           else
@@ -383,14 +416,14 @@ class ArchiviaController < Transmission::BaseController
         # e va in Failure per farmi uscire dalla mia sequenza
         #
         def insert_no_match(row)
-          row  = row.dup
+          row = row.dup
           row[:possibile_match] = 'nessuno'
           @no_archiviate.no_match << row
           Failure("Questa remit non viene archiviata a DB".red)
         end
 
         def get_nome(match)
-          try!{ match[0].dig(:properties,:nome)}
+          try! { match[0].dig(:properties, :nome) }
         end
 
         #
@@ -412,7 +445,7 @@ class ArchiviaController < Transmission::BaseController
         end
 
         #
-        # Accoda la mia riga nella variabile @no_archiviatae
+        # Accoda la mia riga nella variabile @no_archiviate
         # e va in Failure per farmi uscire dalla mia sequenza
         #
         def insert_match(row)
@@ -420,47 +453,67 @@ class ArchiviaController < Transmission::BaseController
           Failure("Questa remit non viene archiviata a DB".red)
         end
 
+        #
+        # Inserisce in row il nome della linea che piu assomiglia a quella che sto cercando
+        #
+        # @return [Success(row)]
+        #
         def add_nome_match_to_row(row, nome_match)
           row = row.dup
           row[:possibile_match] = nome_match
           Success(row)
         end
 
+        #
+        # Dal match che ha trovato fuzzy_match prende l'id
+        #
+        # @param match [Array]
+        #
+        # @return [Succes(id) | Failure()] id del mio match, oppure failure se non lo trova
+        #
         def get_id_transmission(match)
-          try!{ match[0][:id] }
+          try! { match[0][:id] }
         end
 
         #
-        # Salva il nome che ha trovato nel DB transmission
+        # Salva il nome che ha trovato nel datset di mapbox
         # e restitusce Success("ok")
         #
-        def salva_nome_terna(match_line, nome)
-            logger.debug "Salvo il nome_terna a db"
+        def salva_nome_terna(match_line, nome, volt)
+          logger.debug "Salvo il nome_terna a db"
+          if volt == "380"
+            dataset_id = 'cjcb6ahdv0daq2xnwfxp96z9t'
+          else
+            dataset_id = 'cjcfb90n41pub2xp6liaz7quj'
+          end
 
-            # doc_id_transmission   = coll_transmission.find({_id: id_transmission}).limit(1)
-            array_nome_terna_size = match_line[0][:properties][:nome_terna].size
+          # doc_id_transmission   = coll_transmission.find({_id: id_transmission}).limit(1)
+          array_nome_terna_size = match_line[0][:properties][:nome_terna].size
 
-            logger.info "Attenzione questa linee ha gia #{array_nome_terna_size} nomi" if array_nome_terna_size > 0
-            id   = match_line[0][:id]
-            match_line[0][:properties][:nome_terna].push(nome)
+          logger.info "Attenzione questa linee ha gia #{array_nome_terna_size} nomi" if array_nome_terna_size > 0
+          id = match_line[0][:id]
+          match_line[0][:properties][:nome_terna].push(nome)
 
-            json =  match_line[0].to_json
+          # json = {"nome_terna" => match_line[0][:properties][:nome_terna]}.to_json
+          json =  match_line[0].to_json
 
-            url  = "https://api.mapbox.com/datasets/v1/browserino/cjcb6ahdv0daq2xnwfxp96z9t/features/#{id}?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
-            
-            uri  = URI.parse(url)
-            http = Net::HTTP.new(uri.host, uri.port)
-            http.use_ssl = true
-            request = Net::HTTP::Put.new(uri)
-            request.body = json
-            request.set_content_type("application/json")
-            response = http.request(request)
-            if response.kind_of? Net::HTTPSuccess
-              logger.info "nome_terna #{nome} salvato nel db"
-              Success("Salvato nome terna a db")
-            else
-              Failure("Errore nel salvataggio nome linea a db")
-            end
+          url = "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features/#{id}?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+
+          uri = URI.parse(url)
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = true
+          # @todo: ottimizzare con Patch posso fare l'update del campo nome_terna
+          # request = Net::HTTP::Patch.new(uri)
+          request = Net::HTTP::Put.new(uri)
+          request.body = json
+          request.set_content_type("application/json")
+          response = http.request(request)
+          if response.kind_of? Net::HTTPSuccess
+            logger.info "nome_terna #{nome} salvato nel db"
+            Success("Salvato nome terna a db")
+          else
+            Failure("Errore nel salvataggio nome linea a db")
+          end
         end
 
         # Mi chiede se voglio salvare la linea a db
@@ -482,10 +535,10 @@ class ArchiviaController < Transmission::BaseController
       #
       def unique_id(row)
         try! do
-          dt_upd     = row[:dt_upd].strftime("%d/%m/%Y")
-          start_dt   = row[:start_dt].strftime("%d/%m/%Y")
-          end_dt     = row[:end_dt].strftime("%d/%m/%Y")
-          nome       = row[:nome]
+          dt_upd = row[:dt_upd].strftime("%d/%m/%Y")
+          start_dt = row[:start_dt].strftime("%d/%m/%Y")
+          end_dt = row[:end_dt].strftime("%d/%m/%Y")
+          nome = row[:nome]
           Base64.strict_encode64(nome + "-" + dt_upd + "-" + start_dt + "-" + end_dt)
         end
       end
@@ -499,7 +552,7 @@ class ArchiviaController < Transmission::BaseController
       # Failure => @return [Failure(String)]  | ho già una remit uguale interoppe esecuzione e restituisce un messsaggio
       #
       def check_exist_in_db(unique_id)
-        exist = coll_remit.find({ unique_id: unique_id }).limit(1).first
+        exist = coll_remit.find({unique_id: unique_id}).limit(1).first
         exist ? Failure("Ho una remit uguale a db non verra' archiviata") : Success(0)
       end
 
@@ -518,7 +571,7 @@ class ArchiviaController < Transmission::BaseController
       #
       def make_doc(row, id, unique_id)
         try! do
-          rm_decison = ->(hash) { hash.delete_if { |k,v| k == :decision } }
+          rm_decison = -> (hash) { hash.delete_if { |k, v| k == :decision } }
           row.
             ᐅ(~:dup).
             ᐅ(~:merge, {id_transmission: id, unique_id: unique_id}).
@@ -579,14 +632,14 @@ class ArchiviaController < Transmission::BaseController
       def make_file(data, type)
         return Success(nil) if data.nil?
         try! do
-          workbook  = RubyXL::Parser.parse("./template/template.xlsx")
+          workbook = RubyXL::Parser.parse("./template/template.xlsx")
           worksheet = workbook[0]
 
           data.each_with_index do |row, row_index|
             excel_row = doc_to_excel_row(row)
             excel_row << (type == "match" ? "SI" : "NO")
             excel_row.each_with_index do |column, column_index|
-              worksheet.add_cell(5+row_index, column_index, column)
+              worksheet.add_cell(5 + row_index, column_index, column)
             end
           end
           Success(workbook)
@@ -615,10 +668,10 @@ class ArchiviaController < Transmission::BaseController
       type = data.keys[0].to_s
       data = data.values[0]
       in_sequence do
-        get(:workbook_match)     { make_file(data, type)               }
-        get(:path)               { make_path(file, type)               }
-        and_then                 { write_xlsx(workbook_match, path)    }
-        and_yield                { Success(path)                       }
+        get(:workbook_match) { make_file(data, type) }
+        get(:path) { make_path(file, type) }
+        and_then { write_xlsx(workbook_match, path) }
+        and_yield { Success(path) }
       end
     end
 
@@ -638,10 +691,10 @@ class ArchiviaController < Transmission::BaseController
         return Success(0)
       end
 
-      make_html  = MakeHtml.new(match, nomatch)
+      make_html = MakeHtml.new(match, nomatch)
       send_email = SendEmail.new(match_path, nomatch_path)
 
-      make_html.call() >> ->(html) { send_email.call(html) }
+      make_html.call() >> -> (html) { send_email.call(html) }
     end
 
     #
@@ -649,9 +702,9 @@ class ArchiviaController < Transmission::BaseController
     #
     def sposta_file(file)
       try! do
-        folder    = Transmission::Config.path.archivio
+        folder = Transmission::Config.path.archivio
         file_name = file.split("/").last
-        dest      = folder + file_name
+        dest = folder + file_name
         FileUtils.mv file, dest
       end
     end
@@ -679,7 +732,6 @@ class ArchiviaController < Transmission::BaseController
     nome            = row[:nome]
     type_of_line    = "LIN"
     volt            = row[:volt]
-    # start_dt        = row[:start_dt].to_date
     start_dt        = row[:start_dt].strftime("%d/%m/%Y")
     start_hour      = row[:start_dt].strftime("%H:%M:%S")
     stop_dt         = row[:end_dt].strftime("%d/%m/%Y")
@@ -709,7 +761,7 @@ class ArchiviaController < Transmission::BaseController
   end
 
   def stampa(messaggi)
-    Success(messaggi.each{|m| render(msg: m)})
+    Success(messaggi.each { |m| render(msg: m) })
   end
 
   #
@@ -748,19 +800,28 @@ class ArchiviaController < Transmission::BaseController
   end
 
   #
-  # Seleziono la collezzione transmission
+  # Legge il dataset da mapbox
   #
-  def transmission_380
-    url     = "https://api.mapbox.com/datasets/v1/browserino/cjcb6ahdv0daq2xnwfxp96z9t/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+  def leggi_dataset_mapbox(volt)
+    if volt == "380"
+      dataset_id = 'cjcb6ahdv0daq2xnwfxp96z9t'
+    else
+      dataset_id = 'cjcfb90n41pub2xp6liaz7quj'
+    end
+    url = "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
     geojson = open(url, {ssl_verify_mode: 0}).read
     Oj.load(geojson, :symbol_keys => true, :mode => :compat)[:features]
+    # @todo: ottimizzare posso eliminare il campo geometry ma deve vedere quando chaimo il metodo salva_nome_terna
+    # se riesco fare l'update con patch invece di aggiornare l'intero documento
+    # features = Oj.load(geojson, :symbol_keys => true, :mode => :compat)[:features]
+    # features.each { |h| h.delete(:geometry) }
   end
 
   #
   # Seleziono la collezzione remit
   #
   def coll_remit
-    db.collection(collection: "remit")
+    db.collection(collection: "remit_linee")
   end
 
   #
@@ -772,9 +833,5 @@ class ArchiviaController < Transmission::BaseController
 
   memoize :db
   # memoize :coll_transmission
-  memoize :coll_remit
-  memoize :all_line
   memoize :lista_file
-
 end
-

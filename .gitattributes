@@ -8,3 +8,4 @@ VERSION  export-ignore
 archivia.bat export-ignore
 download.bat export-ignore
 scheduler.bat export-ignore
+script_usati export-ignore

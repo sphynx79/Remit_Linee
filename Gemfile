@@ -14,6 +14,7 @@ gem 'nokogiri'
 gem 'elixirize'
 gem 'simple_xlsx_reader'
 gem 'yell'
+gem 'rufus-scheduler', '~>3.5.1'
 
 
 group :development, :test do

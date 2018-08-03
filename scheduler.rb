@@ -17,7 +17,7 @@ $logger.formatter = proc do |severity, datetime, _progname, msg|
       "[#{datetime.strftime('%Y-%m-%d %H:%M:%S')}] #{severity}: #{msg}\n"
 end
 
-ENV['TZ'] = 'Europe/Rome'
+ENV['TZ'] = 'UTC-2'
 
 class Handler
   attr_reader :actions

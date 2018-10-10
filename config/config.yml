@@ -11,7 +11,7 @@ defaults: &defaults
 development:
   <<: *defaults
   database:
-    name: 'transmission'
+    name: 'Ampere'
     adress: '127.0.0.1:27030'
     log_level: "::Logger::INFO"
 
@@ -28,10 +28,10 @@ test:
 production:
   <<: *defaults
   database:
-    name: 'transmission'
+    name: 'Ampere'
     adress1: '10.130.96.220:27018'
-    adress2: '10.130.96.220:27019'
-    adress3: '10.130.96.144:27018'
+    # adress2: '10.130.96.220:27019'
+    # adress3: '10.130.96.144:27018'
     log_level: "::Logger::INFO"
   path:
     download: './excel_file/'

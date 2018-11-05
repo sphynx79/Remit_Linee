@@ -112,6 +112,4 @@ module ReportHelper
 
   end
 
-  
-
 end

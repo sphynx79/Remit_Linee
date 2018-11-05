@@ -36,7 +36,7 @@ class ArchiviaController < Transmission::BaseController
       archivia
     rescue => e
       logger.fatal(e.message)
-      logger.fatal(e.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0])
+      logger.fatal((e.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0..10]).join("\n"))
     end
   end
 
@@ -62,17 +62,17 @@ class ArchiviaController < Transmission::BaseController
         @no_archiviate = NoArchivate.new(file)
         @bulk_op = []
         in_sequence do
-          get(:remit) { leggi_remit(file) }
-          and_then { scan_for_archive(remit) }
-          and_then { write_bulk_op }
-          get(:match) { get_match }
-          get(:match_path) { make_file_xlsx(file, match: match) }
-          get(:nomatch) { get_nomatch }
-          get(:nomatch_path) { make_file_xlsx(file, nomatch: nomatch) }
-          and_then { make_report(match_path, match, nomatch_path, nomatch) }
-          and_then { sposta_file(file) }
-          and_then { sincronizzazione }
-          and_yield { Success("Archiviata #{file.split("/").last} con successo") }
+            get(:remit) { leggi_remit(file) }
+            and_then { scan_for_archive(remit) }
+            and_then { write_bulk_op }
+            get(:match) { get_match }
+            get(:match_path) { make_file_xlsx(file, match: match) }
+            get(:nomatch) { get_nomatch }
+            get(:nomatch_path) { make_file_xlsx(file, nomatch: nomatch) }
+            and_then { make_report(match_path, match, nomatch_path, nomatch) }
+            and_then { sposta_file(file) }
+            and_then { sincronizzazione }
+            and_yield { Success("Archiviata #{file.split("/").last} con successo") }
         end
       end
     end
@@ -162,6 +162,7 @@ class ArchiviaController < Transmission::BaseController
 
       #
       # Prende i valori che mi interessano presenti nello sheet
+      # le date le porto in formato UTC per inserirle a DB
       #
       # @param sheet  [Array]
       # @param dt_upd [DateTime]
@@ -179,9 +180,10 @@ class ArchiviaController < Transmission::BaseController
             end_time = (row[6].is_a? String) ? Time.parse(row[6]) : row[6]
             reason = row[8]
             decision = row[10]
-            start_dt = to_datetime(start_date, start_time)
-            end_dt = to_datetime(end_date, end_time)
-            {nome: nome, volt: volt, dt_upd: dt_upd, start_dt: start_dt, end_dt: end_dt, reason: reason, decision: decision}
+            start_dt = TZ.local_to_utc(to_datetime(start_date, start_time))
+            end_dt = TZ.local_to_utc(to_datetime(end_date, end_time))
+            upd_dt = TZ.local_to_utc(dt_upd)
+            {nome: nome, volt: volt, dt_upd: upd_dt, start_dt: start_dt, end_dt: end_dt, reason: reason, decision: decision}
           end
         end
       end
@@ -199,7 +201,7 @@ class ArchiviaController < Transmission::BaseController
     # sequenza:
     # - cerca id linea in transmission
     # - restitiusce id trovato oppure avvia la ricerca di un possibile id
-    # - crea id univo per questa remita
+    # - crea id univo per questa remit
     # - controlla se esiste questa remit nel DB remit
     # - crea il doc da inserire nel DB remit
     # - lo accoda in una variabile per successivo inserimento in modalità bulk
@@ -773,9 +775,9 @@ class ArchiviaController < Transmission::BaseController
   # @return[DateTime]
   #
   def to_datetime(date, time)
-    DateTime.new(date.year, date.month, date.day, time.hour, time.min, time.sec, time.zone)
+      DateTime.new(date.year, date.month, date.day, time.hour, time.min, time.sec, time.zone)
   rescue
-    DateTime.new(date.year, date.month, date.day)
+      data = DateTime.new(date.year, date.month, date.day)
   end
 
   #

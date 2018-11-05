@@ -29,6 +29,7 @@ require 'open3'
 require 'ap'
 require 'oj'
 require 'json'
+require 'tzinfo'
 # require 'pretty_backtrace'
 #
 # PrettyBacktrace.enable
@@ -40,8 +41,11 @@ include Deterministic::Prelude::Option
 FuzzyMatch.engine = :amatch
 
 APP_ROOT    = Pathname.new(File.expand_path('.', __dir__))
-APP_NAME    = APP_ROOT.basename.to_s
+APP_NAME    = APP_ROOT.parent.basename.to_s
 APP_VERSION = "1"
+TZ = TZInfo::Timezone.get('Europe/Rome')
+ENV["TZ"] = "UTC"
+
 ENV['GLI_DEBUG'] = 'false'
 
 module Transmission

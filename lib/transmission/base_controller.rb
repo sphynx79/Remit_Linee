@@ -12,7 +12,7 @@ module Transmission
 
       render_template do 
         begin
-        Object.const_get(action_view).call(msg)
+          Object.const_get(action_view).call(msg)
         rescue
           p "action: #{action_view} non esiste"
         end

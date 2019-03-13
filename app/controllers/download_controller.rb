@@ -150,3 +150,4 @@ class DownloadController < Transmission::BaseController
   memoize :archivio_path
 
 end
+

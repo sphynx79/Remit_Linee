@@ -1,5 +1,7 @@
+#!/usr/bin/env ruby
+# Encoding: utf-8
+# warn_indent: true
 # frozen_string_literal: true
-# encoding: utf-8
 
 # STDOUT.sync = true
 
@@ -28,16 +30,14 @@ class ArchiviaController < Transmission::BaseController
   attr_reader :linee_380, :linee_220
 
   def start
-    begin
-      @linee_380 = leggi_dataset_mapbox("380")
-      @linee_220 = leggi_dataset_mapbox("220")
-      exit_if_not_files
+    @linee_380 = leggi_dataset_mapbox('380')
+    @linee_220 = leggi_dataset_mapbox('220')
+    exit_if_not_files
 
-      archivia
-    rescue => e
-      logger.fatal(e.message)
-      logger.fatal((e.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0..10]).join("\n"))
-    end
+    archivia
+  rescue => e
+    logger.fatal(e.message)
+    logger.fatal((e.backtrace.select { |v| v =~ /#{APP_NAME}/ }[0..10]).join("\n"))
   end
 
   private
@@ -48,7 +48,7 @@ class ArchiviaController < Transmission::BaseController
   #
   def exit_if_not_files
     if lista_file.empty?
-      Yell['scheduler'].warn("Nessun file da archiviare")
+      Yell['scheduler'].warn('Nessun file da archiviare')
       (exit! 2)
     end
   end
@@ -245,7 +245,7 @@ class ArchiviaController < Transmission::BaseController
         try! do
           logger.info "Cerco per #{nome_terna} l'id della linea nel database"
 
-          if volt.match? /380/
+          if volt.match?(/380/)
             doc = linee_380.lazy.select { |f| f[:properties][:nome_terna].include?(nome_terna) }.first
           else
             doc = linee_220.lazy.select { |f| f[:properties][:nome_terna].include?(nome_terna) }.first

@@ -29,6 +29,7 @@ require 'open3'
 require 'ap'
 require 'oj'
 require 'json'
+require 'csv'
 require 'tzinfo'
 # require 'pretty_backtrace'
 #
@@ -80,6 +81,16 @@ module Transmission
 
   desc 'Carica il file della remit a db'
   command :archivia do |c|
+    c.action do 
+      Transmission::Application.call(@env)
+    end
+  end
+
+  desc 'Esporta anagrafica da MapBox'
+  long_desc %(Esporta anagrafica presente in MapBox e la traforma in csv)
+  command :anagrafica do |c|
+    c.desc 'volt da esportare (380, 220)'
+    c.flag %i[v volt], required: true, type: String
     c.action do 
       Transmission::Application.call(@env)
     end

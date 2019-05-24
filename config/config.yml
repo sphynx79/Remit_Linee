@@ -21,6 +21,7 @@ development:
     match:    './excel_file/Match/'
     nomatch:  './excel_file/NoMatch/'
     sync:     './excel_file_dev'
+    anagrafica: '//ennf1002/unitagp/MEOR/QLIKVIEW/05b REPORT MAPPA ITALIA'
 
 test:
   <<: *defaults
@@ -39,4 +40,5 @@ production:
     match:    './excel_file/Match/'
     nomatch:  './excel_file/NoMatch/'
     sync: '//ennf1002/unitagp/MEOR/QLIKVIEW/05b REPORT MAPPA ITALIA/remit_terna'
+    anagrafica: '//ennf1002/unitagp/MEOR/QLIKVIEW/05b REPORT MAPPA ITALIA'
 

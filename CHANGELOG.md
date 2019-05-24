@@ -1,3 +1,9 @@
+## 1.0.7 (2019-05-24)
+### Added
+-  Aggiunto comando per esportare l'anagrafica da mapbox  ( 2019-05-24 ) [ sphynx79]
+
+
+
 ## 1.0.6 (2019-03-13)
 
 

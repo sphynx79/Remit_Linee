@@ -1,3 +1,9 @@
+## 1.1.0 (2019-08-07)
+### Changed
+-  Aggiornato per farlo funzionare con il nuovo sito  ( 2019-08-07 ) [ sphynx]
+
+
+
 ## 1.0.7 (2019-05-24)
 ### Added
 -  Aggiunto comando per esportare l'anagrafica da mapbox  ( 2019-05-24 ) [ sphynx79]

@@ -1,6 +1,6 @@
 defaults: &defaults
   url:
-    site: 'http://www.terna.it/it-it/sistemaelettrico/transparencyreport/transmissionandinterconnection/plannedoutages.aspx' 
+    site: 'https://www.terna.it/it/sistema-elettrico/dispacciamento/adeguatezza/programmazione' 
 
   mail:
     from: 'michele.boscolo@eni.com'
@@ -31,8 +31,8 @@ production:
   database:
     name: 'Ampere'
     adress1: '10.130.96.220:27018'
-    adress2: '10.130.96.220:27019'
-    adress3: '10.130.96.144:27018'
+    # adress2: '10.130.96.220:27019'
+    # adress3: '10.130.96.144:27018'
     log_level: "::Logger::INFO"
   path:
     download: './excel_file/'

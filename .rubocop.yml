@@ -42,8 +42,6 @@ Metrics/ModuleLength:
   Enabled: false
 Style/GuardClause:
   Enabled: false
-Style/VariableNumber:
-  Enabled: false
 EndOfLine:
   Enabled: false
 Style/GlobalVars:

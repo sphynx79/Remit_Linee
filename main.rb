@@ -13,7 +13,7 @@ require 'open-uri'
 require 'net/http'
 require 'elixirize'
 require 'simple_xlsx_reader'
-require 'pry'
+# require 'pry'
 require 'fuzzy_match'
 require 'amatch'
 require 'settingslogic'
@@ -27,10 +27,11 @@ require 'net/smtp'
 require 'rubyXL'
 require 'open3'
 require 'ap'
-require 'oj'
+# require 'oj'
 require 'json'
 require 'csv'
 require 'tzinfo'
+require 'watir'
 # require 'pretty_backtrace'
 #
 # PrettyBacktrace.enable
@@ -173,9 +174,6 @@ module Transmission
   if __FILE__ == $0
    exit run(ARGV)
   end
-
-
-
 
 end
 

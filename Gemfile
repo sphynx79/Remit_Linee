@@ -21,7 +21,9 @@ gem 'settingslogic', '~>2.0.9'
 gem 'simple_xlsx_reader', '~>1.0.4'
 gem 'tty-prompt', '~>0.18.1'
 gem 'tzinfo', '~>1.2.5'
+gem 'tzinfo-data'
 gem 'yell', '~>2.0.7'
+gem 'watir', '~>6.16.5'
 
 group :development, :test do
   gem 'awesome_print', '~>1.8.0'

@@ -45,7 +45,8 @@ SET conemu_exe=%CMDER_ROOT%\vendor\conemu-maximus5\ConEmu.exe
 SET conemu_ico=%CMDER_ROOT%\icons\cmder.ico
 SET conemu_cfgfile=%CMDER_ROOT%\config\ConEmu.xml
 SET conemu_init=%CMDER_ROOT%\vendor\init.bat
-SET ruby=C:\Ruby\bin\ruby.exe
+:: shim di mise: risolve la versione ruby dal mise.toml del progetto
+SET ruby=E:\msys64\home\Sphynx\.local\share\mise\shims\ruby.exe
 SET app= %remit_linee_folder%scheduler.rb
 SET argv=%*
 

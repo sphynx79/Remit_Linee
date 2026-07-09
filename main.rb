@@ -3,7 +3,8 @@
 
 $LOAD_PATH.unshift '.'
 
-require 'active_support/core_ext/string/inflections'
+require 'bundler/setup'
+require 'dry/inflector'
 require 'pathname'
 require 'gli'
 require 'mongo'
@@ -16,16 +17,14 @@ require 'simple_xlsx_reader'
 # require 'pry'
 require 'fuzzy_match'
 require 'amatch'
-require 'settingslogic'
 require 'yell'
-require 'deterministic'
-# @todo: vedere se lasciare maybe se mi serve
-require 'deterministic/maybe'
+require 'functional-light-service'
 require 'lib/transmission'
 require 'tty-prompt'
 require 'net/smtp'
 require 'rubyXL'
 require 'open3'
+require 'base64'
 require 'ap'
 require 'oj'
 require 'json'
@@ -37,8 +36,7 @@ require 'watir'
 # PrettyBacktrace.enable
 # PrettyBacktrace.multi_line = true
 
-include Deterministic::Prelude
-include Deterministic::Prelude::Option
+include FunctionalLightService::Prelude
 
 FuzzyMatch.engine = :amatch
 

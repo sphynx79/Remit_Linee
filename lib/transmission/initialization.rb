@@ -1,4 +1,7 @@
 module Transmission
+  # Inflettore per derivare i nomi delle costanti dai nomi file (sostituisce ActiveSupport::Inflector)
+  INFLECTOR = Dry::Inflector.new
+
   class Initialization
     class << self
 
@@ -16,28 +19,28 @@ module Transmission
       def load_model
         Dir[APP_ROOT.join('app', 'models', '*.rb')].each do |model_file|
           filename = File.basename(model_file).gsub('.rb', '')
-          Object.autoload ActiveSupport::Inflector.camelize(filename), model_file
+          Object.autoload INFLECTOR.camelize(filename), model_file
         end
       end
 
       def load_controller
         Dir[APP_ROOT.join('app', 'controllers', '*.rb')].each do |controller_file|
          filename = File.basename(controller_file).gsub('.rb', '')
-         Object.autoload ActiveSupport::Inflector.camelize(filename), controller_file
+         Object.autoload INFLECTOR.camelize(filename), controller_file
         end
       end
 
       def load_helper
         Dir[APP_ROOT.join('app', 'helper', '*.rb')].each do |helper_file|
           filename = File.basename(helper_file).gsub('.rb', '')
-           Object.autoload ActiveSupport::Inflector.camelize(filename), helper_file
+           Object.autoload INFLECTOR.camelize(filename), helper_file
         end
       end
 
       def load_view
         # Dir[APP_ROOT.join('app', 'views', 'layout', '*.rb')].each do |layout_file|
         #   filename = File.basename(layout_file).gsub('.rb', '')
-        #   autoload ActiveSupport::Inflector.camelize(filename), layout_file
+        #   autoload INFLECTOR.camelize(filename), layout_file
         # end
       end
 

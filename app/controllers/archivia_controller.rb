@@ -16,7 +16,7 @@ class NoArchivate
   end
 end
 
-Decision = Deterministic::enum {
+Decision = FunctionalLightService.enum {
   Si()
   No()
   Forse(:scheduler)
@@ -308,7 +308,7 @@ class ArchiviaController < Transmission::BaseController
         end
 
         #
-        # Uso il Decision type creato con Deterministic::enum e setto lo stato della decsione
+        # Uso il Decision type creato con FunctionalLightService.enum e setto lo stato della decsione
         #
         # @param decision[String]
         # @param scheduler[Boolean]
@@ -499,7 +499,7 @@ class ArchiviaController < Transmission::BaseController
           # json = {"nome_terna" => match_line[0][:properties][:nome_terna]}.to_json
           json =  match_line[0].to_json
 
-          url = "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features/#{id}?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+          url = "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features/#{id}?access_token=#{ENV['MAPBOX_SECRET_TOKEN']}"
 
           uri = URI.parse(url)
           http = Net::HTTP.new(uri.host, uri.port)
@@ -810,8 +810,8 @@ class ArchiviaController < Transmission::BaseController
     else
       dataset_id = 'cjcfb90n41pub2xp6liaz7quj'
     end
-    url = "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
-    geojson = open(url, {ssl_verify_mode: 0}).read
+    url = "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features?access_token=#{ENV['MAPBOX_SECRET_TOKEN']}"
+    geojson = URI.open(url, {ssl_verify_mode: 0}).read
     Oj.load(geojson, :symbol_keys => true, :mode => :compat)[:features]
     # @todo: ottimizzare posso eliminare il campo geometry ma deve vedere quando chaimo il metodo salva_nome_terna
     # se riesco fare l'update con patch invece di aggiornare l'intero documento

@@ -44,12 +44,12 @@ class AnagraficaController < Transmission::BaseController
   end
 
   def linee_dataset_mapbox
-    geojson = open(url, {ssl_verify_mode: 0}).read
+    geojson = URI.open(url, {ssl_verify_mode: 0}).read
     Oj.load(geojson, :symbol_keys => true, :mode => :compat)[:features]
   end
 
   def url
-    "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features?access_token=sk.eyJ1IjoiYnJvd3NlcmlubyIsImEiOiJjamEzdjBxOGM5Nm85MzNxdG9mOTdnaDQ0In0.tMMxfE2W6-WCYIRzBmCVKg"
+    "https://api.mapbox.com/datasets/v1/browserino/#{dataset_id}/features?access_token=#{ENV['MAPBOX_SECRET_TOKEN']}"
   end
 
   memoize :volt

@@ -95,7 +95,7 @@ class DownloadController < Transmission::BaseController
     end
 
     def remote_file(url)
-      try! { open(url, "User-Agent" => "ruby") }
+      try! { URI.open(url, "User-Agent" => "ruby") }
     end
 
     def remote_read(rem_file)
@@ -107,7 +107,7 @@ class DownloadController < Transmission::BaseController
     end
 
     def open_local(file)
-      try! { open(file, "wb") }
+      try! { File.open(file, "wb") }
     end
 
     def write_local(file, rem_read)

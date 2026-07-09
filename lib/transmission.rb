@@ -1,6 +1,7 @@
 $:.unshift File.expand_path(File.dirname(__FILE__)) 
 
 module Transmission
+  autoload :Settings,       'transmission/settings'
   autoload :Config,         'transmission/config'
   autoload :Initialization, 'transmission/initialization'
   autoload :Application,    'transmission/application'

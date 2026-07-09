@@ -3,11 +3,12 @@
 # warn_indent: true
 # frozen_string_literal: true
 
+require 'bundler/setup'
 require 'rufus-scheduler'
 require 'logger'
 require 'open3'
 
-    $logger = Logger.new(STDOUT)
+$logger = Logger.new(STDOUT)
 $logger.level = Logger::DEBUG
 # $logger.level = Logger::WARN
 # STDOUT.sync = true

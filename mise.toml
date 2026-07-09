@@ -1,0 +1,9 @@
+[tools]
+ruby = "4.0.1"
+
+[env]
+# fiddle (richiesta da reline/pry su Windows, solo in development) viene
+# compilata da bundler contro libffi-8.dll: RubyInstaller restringe il
+# DLL search path, quindi la DLL va esposta via RUBY_DLL_PATH.
+# La copia in vendor/dll proviene dalla fiddle bundled di RubyInstaller.
+RUBY_DLL_PATH = "{{config_root}}/vendor/dll"

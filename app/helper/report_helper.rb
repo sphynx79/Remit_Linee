@@ -11,7 +11,7 @@ module ReportHelper
     def call
       sanitize_match   = sanitize(match)
       sanitize_nomatch = sanitize(nomatch)
-      html = ERB.new(File.read("./template/report.html.erb"),nil, '-').result(binding)
+      html = ERB.new(File.read("./template/report.html.erb"), trim_mode: '-').result(binding)
       Success(html)
     end
 
